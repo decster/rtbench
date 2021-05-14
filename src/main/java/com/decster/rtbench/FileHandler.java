@@ -19,7 +19,7 @@ public class FileHandler implements WorkloadHandler {
 
     }
     @Override
-    public void onEpochBegin(int id, String name) {
+    public void onEpochBegin(long id, String name) {
         // TODO Auto-generated method stub
 
     }
@@ -31,9 +31,14 @@ public class FileHandler implements WorkloadHandler {
     }
 
     @Override
-    public void onEpochEnd(int id, String name) {
+    public void onEpochEnd(long id, String name) {
         // TODO Auto-generated method stub
 
     }
 
+    @Override
+    public void onClose() {
+        // TODO Auto-generated method stub
+
+    }
 }

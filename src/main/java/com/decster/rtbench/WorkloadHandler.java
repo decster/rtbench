@@ -1,11 +1,21 @@
 package com.decster.rtbench;
 
+import com.typesafe.config.Config;
+
 public interface WorkloadHandler {
-    void onSetupBegin();
-    void onSqlOperation(SqlOperation op);
-    void onSetupEnd();
-    void onEpochBegin(long id, String name);
-    void onDataOperation(DataOperation op);
-    void onEpochEnd(long id, String name);
-    void onClose();
+	void init(Config conf, Workload load) throws Exception;
+
+	void onSetupBegin() throws Exception;
+
+	void onSqlOperation(SqlOperation op) throws Exception;
+
+	void onSetupEnd() throws Exception;
+
+	void onEpochBegin(long id, String name) throws Exception;
+
+	void onDataOperation(DataOperation op) throws Exception;
+
+	void onEpochEnd(long id, String name) throws Exception;
+
+	void onClose() throws Exception;
 }

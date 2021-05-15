@@ -41,13 +41,13 @@ public abstract class Workload {
         }
     }
 
-    abstract public void setup();
+    abstract public void setup() throws Exception;
 
-    abstract public void processEpoch(long id, long epochTs, long duration);
+    abstract public void processEpoch(long id, long epochTs, long duration) throws Exception;
 
-    abstract public void close();
+    abstract public void close() throws Exception;
 
-    public void run() {
+    public void run() throws Exception {
         handler.onSetupBegin();
         setup();
         handler.onSetupEnd();

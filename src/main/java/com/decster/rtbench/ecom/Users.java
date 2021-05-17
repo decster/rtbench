@@ -1,6 +1,7 @@
 package com.decster.rtbench.ecom;
 
 import com.decster.rtbench.DataOperation;
+import com.decster.rtbench.Locations;
 import com.decster.rtbench.Utils;
 import com.decster.rtbench.WorkloadHandler;
 import com.typesafe.config.Config;
@@ -31,7 +32,7 @@ public class Users {
         return String.format("address %d", userId);
     }
 
-    User getUser(long id) {
+    User get(long id) {
         User ret = new User();
         ret.id = id;
         ret.name = String.format("user%d", id);
@@ -49,11 +50,10 @@ public class Users {
         }
         ret.address = genAddress(id);
         rs = Utils.nextRand(rs);
-        long cid = rs % 1135;
-        ret.city = String.format("c%d", cid);
-        long pid = cid % 43;
-        ret.province = String.format("p%d", pid);
-        ret.country = pid == 42 ? "other" : "china";
+        Locations.Location lc = load.locations.sample(rs);
+        ret.city = lc.city;
+        ret.province = lc.province;
+        ret.country = lc.country;
         return ret;
     }
 
@@ -86,7 +86,19 @@ public class Users {
         for (long i=0;i<num;i++) {
             DataOperation op = new DataOperation();
             op.table = tableName;
+            op.op = DataOperation.Op.INSERT;
             op.fieldNames = allColumnNames;
+            User user = get(i);
+            op.fields = new Object[] {
+                    user.id,
+                    user.name,
+                    user.age,
+                    user.sex,
+                    user.address,
+                    user.city,
+                    user.province,
+                    user.country
+            };
             handler.onDataOperation(op);
         }
     }

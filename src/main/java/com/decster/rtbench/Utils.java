@@ -1,5 +1,8 @@
 package com.decster.rtbench;
 
+import org.apache.commons.math3.distribution.PoissonDistribution;
+import org.apache.commons.math3.random.Well19937c;
+
 public class Utils {
     public static long RAND_MAX = 1L << 48;
 
@@ -33,7 +36,7 @@ public class Utils {
         }
 
         /**
-         * @param v uniform sample [0, 1)
+         * @param x uniform sample [0, 1)
          * @return power distribution sample
          */
         public int sample(double x) {
@@ -47,6 +50,23 @@ public class Utils {
         public int sample(long v) {
             double x = (double)v / RAND_MAX;
             return sample(x);
+        }
+    }
+
+    static public class Poisson {
+        PoissonDistribution poisson;
+        int factor = 1;
+
+        public Poisson(double mean, long seed) {
+            if (mean >= 10000) {
+                mean /= 10;
+                factor = 10;
+            }
+            poisson = new PoissonDistribution(new Well19937c(seed), mean, 1.0E-12D, 10000000);
+        }
+
+        public int next() {
+            return poisson.sample() * factor;
         }
     }
 }

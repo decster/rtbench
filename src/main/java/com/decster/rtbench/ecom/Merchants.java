@@ -2,6 +2,10 @@ package com.decster.rtbench.ecom;
 
 import java.util.Random;
 
+import com.decster.rtbench.DataOperation;
+import com.decster.rtbench.Locations;
+import com.decster.rtbench.Utils;
+import com.decster.rtbench.WorkloadHandler;
 import com.typesafe.config.Config;
 
 public class Merchants {
@@ -21,8 +25,25 @@ public class Merchants {
         return num;
     }
 
+    private static final long seed = 19037806123321843L;
+
+    public long sample(long id) {
+        return Utils.nextRand(id, seed) % num;
+    }
+
     Merchant get(long id) {
-        return null;
+        Merchant ret = new Merchant();
+        ret.id = (int)id;
+        ret.name = String.format("merchant%d", id);
+        ret.address = String.format("address m%d", id);
+        long rs = Utils.nextRand(id);
+        Locations.Location lc = load.locations.sample(rs);
+        ret.city = lc.city;
+        ret.province = lc.province;
+        ret.country = lc.country;
+        rs = Utils.nextRand(rs);
+        ret.phone = String.format("1%010d", rs % 10000000000L);
+        return ret;
     }
 
     String getCreateTableSql() {
@@ -45,4 +66,28 @@ public class Merchants {
         }
         return ret;
     }
+
+    static final String tableName = "merchants";
+    static final String[] allColumnNames = {"id", "name", "address", "city", "province", "country", "phone"};
+
+    void loadAllData(WorkloadHandler handler) throws Exception {
+        for (long i=0;i<num;i++) {
+            DataOperation op = new DataOperation();
+            op.table = tableName;
+            op.op = DataOperation.Op.INSERT;
+            op.fieldNames = allColumnNames;
+            Merchant m = get(i);
+            op.fields = new Object[] {
+                    m.id,
+                    m.name,
+                    m.address,
+                    m.city,
+                    m.province,
+                    m.country,
+                    m.phone
+            };
+            handler.onDataOperation(op);
+        }
+    }
+
 }

@@ -11,8 +11,10 @@ public class Orders {
     EcomWorkload load;
     Config conf;
     long ordersPerDay;
-    int ordersPerSecond;
+    double ordersPerSecond;
     long curId;
+    long [] activeOrders;
+    int numActiveOrders;
 
     static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyyMMdd");
     static final PowerDist paymentTime = new PowerDist(10, 300);
@@ -20,6 +22,7 @@ public class Orders {
     static final PowerDist deliveryFinishTime = new PowerDist(3600*20, 3600*24*5);
     static final PowerDist quantityDist = new PowerDist(1, 20, 2.5f);
     static final PowerDist discountDist = new PowerDist(10, 60, 3);
+    Utils.Poisson poisson;
 
     static enum State {
         CREATED,
@@ -32,20 +35,54 @@ public class Orders {
         this.load = load;
         this.conf = conf;
         this.ordersPerDay = conf.getLong("orders_per_day");
-        this.ordersPerSecond = (int)(ordersPerDay / (3600 * 24));
+        this.ordersPerSecond = (ordersPerDay / (3600 * 24.0));
         this.curId = 1;
+        this.numActiveOrders = 0;
+        this.activeOrders = new long[0];
+        poisson = new Utils.Poisson(ordersPerSecond, 1);
     }
 
-    long[] generate(int ts) {
+    long[] generate(int ts, int duration) {
         // to save memory, each order is represented as 128bit integer:
         // (orderId int64, startTs int32, nextEventTs int32)
-        long[] ret = new long[ordersPerSecond*2];
-        for (int i=0;i<ordersPerSecond;i++) {
+        int n = 0;
+        for (int i=0;i<duration;i++) {
+            n+=poisson.next();
+        }
+        if (n == 0) {
+            return null;
+        }
+        long[] ret = new long[n*2];
+        for (int i=0;i<n;i++) {
             ret[i*2] = curId + i;
             ret[i*2+1] = ((long)ts << 32) | ts;
         }
-        curId += ordersPerSecond;
+        curId += n;
         return ret;
+    }
+
+    void addNewOrders(long [] newOrders) throws Exception {
+        int newNumActiveOrders = numActiveOrders + newOrders.length;
+        if (newNumActiveOrders > 2000000000) {
+            throw new Exception("too many active orders: " + newNumActiveOrders);
+        }
+        if (newNumActiveOrders > activeOrders.length) {
+            long [] newActiveOrders = new long[(numActiveOrders+newOrders.length)*3/2];
+            System.arraycopy(activeOrders, 0, newActiveOrders, 0, numActiveOrders);
+            System.arraycopy(newOrders, 0, newActiveOrders, numActiveOrders, newOrders.length);
+            activeOrders = newActiveOrders;
+        } else {
+            System.arraycopy(newOrders, 0, activeOrders, numActiveOrders, newOrders.length);
+        }
+        numActiveOrders = newNumActiveOrders;
+    }
+
+    void processEpoch(int ts, int duration) throws Exception {
+        long [] newOrders = generate(ts, duration);
+        addNewOrders(newOrders);
+        for (int curTS = ts; curTS < ts + duration; curTS++) {
+
+        }
     }
 
     Order getOrder(long id, long startTsAndNextTs, int curTs) {

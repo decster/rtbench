@@ -1,14 +1,13 @@
 package com.decster.rtbench;
 
-import com.google.gson.JsonArray;
-
 public class DataOperation {
     public enum Op {
-        UPSERT,
+        INSERT,
+        UPDATE,
         DELETE
     }
-    public Op op = Op.UPSERT;
+    public Op op = Op.INSERT;
     public String table;
     public String[] fieldNames;
-    public JsonArray fields;
+    public Object[] fields;
 }

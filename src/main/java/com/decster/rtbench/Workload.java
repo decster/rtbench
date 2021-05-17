@@ -11,20 +11,20 @@ import com.typesafe.config.Config;
 public abstract class Workload {
     private static final Logger LOG = LogManager.getLogger(Workload.class);
     protected Config conf;
-    protected WorkloadHandler handler;
+    public WorkloadHandler handler;
 
     long epochDuration;
     long startTs;
     long endTs;
-    static SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss");
+    static SimpleDateFormat epochNameformatter = new SimpleDateFormat("yyyyMMdd_HHmmss");
 
     static long stringToTs(String str) throws Exception {
-        Date sd = formatter.parse(str);
+        Date sd = epochNameformatter.parse(str);
         return sd.getTime() / 1000;
     }
 
-    static String tsToString(long ts) {
-        return formatter.format(new Date(ts*1000));
+    static String tsToEpochName(long ts) {
+        return epochNameformatter.format(new Date(ts*1000));
     }
 
     public void init(Config conf, WorkloadHandler handler) throws Exception {
@@ -57,7 +57,7 @@ public abstract class Workload {
             if (endTs > 0 && curTs >= endTs) {
                 break;
             }
-            String epochName = tsToString(curTs);
+            String epochName = tsToEpochName(curTs);
             LOG.info("start epoch " + id + " " + epochName);
             handler.onEpochBegin(id, epochName);
             processEpoch(id, curTs, epochDuration);

@@ -82,15 +82,17 @@ public class Goods {
 
     static final String tableName = "goods";
     static final String[] allColumnNames = {"id", "name", "category", "subcategory", "brand", "type"};
+    static final int[] keyColumnIdxs = {0};
 
     void loadAllData(WorkloadHandler handler) throws Exception {
         for (long i=0;i<num;i++) {
             DataOperation op = new DataOperation();
             op.table = tableName;
             op.op = DataOperation.Op.INSERT;
-            op.fieldNames = allColumnNames;
+            op.fullFieldNames = allColumnNames;
+            op.keyFieldIdxs = keyColumnIdxs;
             Good good = get(i);
-            op.fields = new Object[] {
+            op.fullFields = new Object[] {
                     good.id,
                     good.name,
                     good.categroy,

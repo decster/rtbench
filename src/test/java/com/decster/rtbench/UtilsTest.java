@@ -26,4 +26,15 @@ public class UtilsTest {
         t(10000, 1000);
         t(50000, 1000);
     }
+
+    @Test
+    public void testPowerDist() {
+        Utils.PowerDist p = new Utils.PowerDist(10, 60, 3);
+        long r = Utils.nextRand(1, 1);
+        for (int i=0;i<100000;i++) {
+            r = Utils.nextRand(r);
+            int v = p.sample(r);
+            assertTrue(v >= 10 && v < 60);
+        }
+    }
 }

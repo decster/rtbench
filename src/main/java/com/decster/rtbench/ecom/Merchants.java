@@ -69,15 +69,17 @@ public class Merchants {
 
     static final String tableName = "merchants";
     static final String[] allColumnNames = {"id", "name", "address", "city", "province", "country", "phone"};
+    static final int[] keyColumnIdxs = {0};
 
     void loadAllData(WorkloadHandler handler) throws Exception {
         for (long i=0;i<num;i++) {
             DataOperation op = new DataOperation();
             op.table = tableName;
             op.op = DataOperation.Op.INSERT;
-            op.fieldNames = allColumnNames;
+            op.fullFieldNames = allColumnNames;
+            op.keyFieldIdxs = keyColumnIdxs;
             Merchant m = get(i);
-            op.fields = new Object[] {
+            op.fullFields = new Object[] {
                     m.id,
                     m.name,
                     m.address,

@@ -8,6 +8,7 @@ import java.sql.Statement;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.decster.rtbench.DataOperation.Op;
 import com.typesafe.config.Config;
 
 public class MysqlHandler implements WorkloadHandler {
@@ -19,37 +20,35 @@ public class MysqlHandler implements WorkloadHandler {
     boolean dryRun;
 
     StringBuilder batchSB;
-    String batchTable;
-    DataOperation.Op batchOp;
+    DataOperation batchFirst;
     int curBatchSize = 0;
     int batchSize;
 
-    void startBatch(String table, DataOperation.Op op) {
+    void startBatch(DataOperation op) throws Exception {
         batchSB = new StringBuilder();
-        batchTable = table;
-        batchOp = op;
+        batchFirst = op;
         curBatchSize = 0;
-        if (op == DataOperation.Op.INSERT) {
-            // upsert
-            batchSB.append("replace into ");
-            batchSB.append(table);
+        if (batchFirst.op == Op.INSERT || batchFirst.op == Op.UPSERT) {
+            // insert & upsert both use insert
+            batchSB.append("insert into ");
+            batchSB.append(batchFirst.table);
             batchSB.append(" values ");
         } else {
-            // TODO: delete
+            throw new Exception("op not supported");
         }
     }
 
-    void batchAdd(DataOperation op) {
-        if (batchOp == DataOperation.Op.INSERT) {
+    void batchAdd(DataOperation op) throws Exception {
+        if (batchFirst.op == Op.INSERT || batchFirst.op == Op.UPSERT) {
             if (curBatchSize > 0) {
                 batchSB.append(',');
             }
             batchSB.append(" (");
-            for (int i=0;i<op.fields.length;i++) {
+            for (int i=0;i<op.fullFields.length;i++) {
                 if (i > 0) {
                     batchSB.append(',');
                 }
-                Object f = op.fields[i];
+                Object f = op.fullFields[i];
                 if (f != null) {
                     if (f instanceof String) {
                         batchSB.append('\'');
@@ -67,19 +66,41 @@ public class MysqlHandler implements WorkloadHandler {
             }
             batchSB.append(")");
         } else {
-            // TODO: delete
+            throw new Exception("op not supported");
         }
         curBatchSize++;
     }
 
-    void flushCurBatch() throws SQLException {
+    void flushCurBatch() throws Exception {
         if (curBatchSize == 0) {
             return;
         }
-        if (batchOp == DataOperation.Op.INSERT) {
-            //
-        } else {
-            // TODO: delete
+        if (batchFirst.op == Op.UPSERT) {
+            boolean first = true;
+            batchSB.append("as v on duplicate key update ");
+            int kidx = 0;
+            int k = batchFirst.keyFieldIdxs[kidx];
+            for (int i=0;i<batchFirst.fullFieldNames.length;i++) {
+                if (i == k) {
+                    ++kidx;
+                    k = kidx < batchFirst.keyFieldIdxs.length ? batchFirst.keyFieldIdxs[kidx] : -1;
+                    continue;
+                }
+                String name = batchFirst.fullFieldNames[i];
+                if (first) {
+                    first = false;
+                } else {
+                    batchSB.append(',');
+                }
+                batchSB.append(name);
+                batchSB.append("=v.");
+                batchSB.append(name);
+
+            }
+        } else if (batchFirst.op == Op.UPDATE) {
+            throw new Exception("op UPDATE not supported");
+        } else if (batchFirst.op == Op.DELETE) {
+            throw new Exception("op DELETE not supported");
         }
         String sql = batchSB.toString();
         if (dryRun) {
@@ -93,10 +114,10 @@ public class MysqlHandler implements WorkloadHandler {
 
     void process(DataOperation op) throws Exception {
         if (curBatchSize == 0) {
-            startBatch(op.table, op.op);
-        } else if (op.table != batchTable || op.op != batchOp) {
+            startBatch(op);
+        } else if (op.table != batchFirst.table || op.op != batchFirst.op) {
             flushCurBatch();
-            startBatch(op.table, op.op);
+            startBatch(op);
         }
         batchAdd(op);
         if (curBatchSize == batchSize) {
@@ -161,18 +182,27 @@ public class MysqlHandler implements WorkloadHandler {
 
     @Override
     public void onSetupEnd() throws Exception {
-        flushCurBatch();
+        flush();
         closeStatement();
     }
 
     @Override
     public void onEpochBegin(long id, String name) throws Exception {
         prepareStatement();
+        if (!dryRun) {
+            String dbName = conf.getString("db.name");
+            st.execute("use " + dbName);
+        }
     }
 
     @Override
     public void onDataOperation(DataOperation op) throws Exception {
         process(op);
+    }
+
+    @Override
+    public void flush() throws Exception {
+        flushCurBatch();
     }
 
     @Override

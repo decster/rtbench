@@ -29,13 +29,13 @@ public class Users {
     }
 
     public String genAddress(long userId) {
-        return String.format("address %d", userId);
+        return "address " +  userId;
     }
 
     User get(long id) {
         User ret = new User();
         ret.id = id;
-        ret.name = String.format("user%d", id);
+        ret.name = "user" + id;
         long rs = Utils.nextRand(id);
         if (rs % 51 == 0) {
             ret.age = null;
@@ -81,15 +81,17 @@ public class Users {
 
     static final String tableName = "users";
     static final String[] allColumnNames = {"id", "name", "age", "sex", "address", "city", "province", "country"};
+    static final int[] keyColumnIdxs = {0};
 
     void loadAllData(WorkloadHandler handler) throws Exception {
         for (long i=0;i<num;i++) {
             DataOperation op = new DataOperation();
             op.table = tableName;
             op.op = DataOperation.Op.INSERT;
-            op.fieldNames = allColumnNames;
+            op.fullFieldNames = allColumnNames;
+            op.keyFieldIdxs = keyColumnIdxs;
             User user = get(i);
-            op.fields = new Object[] {
+            op.fullFields = new Object[] {
                     user.id,
                     user.name,
                     user.age,

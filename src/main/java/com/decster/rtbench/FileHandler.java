@@ -15,6 +15,7 @@ public class FileHandler implements WorkloadHandler {
     private static final Logger LOG = LogManager.getLogger(FileHandler.class);
     Config conf;
     Workload load;
+    boolean dryRun;
     String outputDir;
     PrintWriter curSqlStream;
     String stageName;
@@ -42,9 +43,13 @@ public class FileHandler implements WorkloadHandler {
     public void init(Config conf, Workload load) throws Exception {
         this.conf = conf;
         this.load = load;
-        this.outputDir = conf.getString("handler.output_dir");
+        this.dryRun = conf.getBoolean("dry_run");
+        this.outputDir = conf.getString("handler.file.output_dir");
         this.fieldDelimiter = conf.getString("handler.file.field_delimiter");
         this.fieldNull = conf.getString("handler.file.field_null");
+        if (dryRun) {
+            return;
+        }
         File d = new File(outputDir);
         if (d.isFile()) {
             LOG.error("output_dir is a file: " + outputDir);
@@ -60,7 +65,9 @@ public class FileHandler implements WorkloadHandler {
 
     @Override
     public void onSetupBegin() throws Exception {
-        curSqlStream = new PrintWriter(outputDir + "/setup.sql");
+        if (!dryRun) {
+            curSqlStream = new PrintWriter(outputDir + "/setup.sql");
+        }
         stageName = "setup";
         writerByTable = new HashMap<>();
     }
@@ -86,18 +93,23 @@ public class FileHandler implements WorkloadHandler {
 
     @Override
     public void onSqlOperation(SqlOperation op) throws Exception {
-        curSqlStream.append(op.sql);
-        curSqlStream.append(";\n");
+        if (!dryRun) {
+            curSqlStream.append(op.sql);
+            curSqlStream.append(";\n");
+        }
     }
 
     @Override
     public void onDataOperation(DataOperation op) throws Exception {
+        if (dryRun) {
+            return;
+        }
         PrintWriter out = getWriterForTable(op.table);
-        for (int i=0;i<op.fields.length;i++) {
+        for (int i=0;i<op.fullFields.length;i++) {
             if (i > 0) {
                 out.append(fieldDelimiter);
             }
-            Object f = op.fields[i];
+            Object f = op.fullFields[i];
             if (f != null) {
                 if (f instanceof Number) {
                     out.append(f.toString());
@@ -109,6 +121,13 @@ public class FileHandler implements WorkloadHandler {
             }
         }
         out.append('\n');
+    }
+
+    @Override
+    public void flush() throws Exception {
+        for (Map.Entry<String, PrintWriter> kv : writerByTable.entrySet()) {
+            kv.getValue().flush();
+        }
     }
 
     @Override

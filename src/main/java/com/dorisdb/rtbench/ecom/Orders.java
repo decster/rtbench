@@ -53,7 +53,11 @@ public class Orders {
         nextEventTsIndex = new IntArray[0];
         indexingStartTs = 0;
         indexingEndTs = 0;
-        indexingDuration = (int)conf.getDuration("order_index_duration").getSeconds();
+        if (conf.hasPath("order_index_duration")) {
+            indexingDuration = (int)conf.getDuration("order_index_duration").getSeconds();
+        } else {
+            indexingDuration = (int)conf.getDuration("epoch_duration").getSeconds();
+        }
         poisson = new Utils.Poisson(ordersPerSecond, 1);
     }
 

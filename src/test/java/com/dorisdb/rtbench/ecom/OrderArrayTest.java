@@ -1,10 +1,11 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
 import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-import com.decster.rtbench.IntArray;
+import com.dorisdb.rtbench.IntArray;
+import com.dorisdb.rtbench.ecom.OrderArray;
 
 public class OrderArrayTest {
 

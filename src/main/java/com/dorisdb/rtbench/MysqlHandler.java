@@ -1,4 +1,4 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -8,7 +8,7 @@ import java.sql.Statement;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.decster.rtbench.DataOperation.Op;
+import com.dorisdb.rtbench.DataOperation.Op;
 import com.typesafe.config.Config;
 
 public class MysqlHandler implements WorkloadHandler {
@@ -18,6 +18,7 @@ public class MysqlHandler implements WorkloadHandler {
     Connection con;
     Statement st;
     boolean dryRun;
+    String dbName;
 
     StringBuilder batchSB;
     DataOperation batchFirst;
@@ -141,6 +142,7 @@ public class MysqlHandler implements WorkloadHandler {
         this.conf = conf;
         this.load = load;
         this.batchSize = conf.getInt("handler.mysql.batch_size");
+        this.dbName = conf.getString("db.name");
         this.dryRun = conf.getBoolean("dry_run");
     }
 
@@ -174,8 +176,9 @@ public class MysqlHandler implements WorkloadHandler {
 
     @Override
     public void onSqlOperation(SqlOperation op) throws Exception {
-        LOG.info("execute sql: " + op.sql);
-        if (!dryRun) {
+        if (dryRun) {
+            LOG.info("execute sql: " + op.sql);
+        } else {
             st.execute(op.sql);
         }
     }
@@ -190,7 +193,6 @@ public class MysqlHandler implements WorkloadHandler {
     public void onEpochBegin(long id, String name) throws Exception {
         prepareStatement();
         if (!dryRun) {
-            String dbName = conf.getString("db.name");
             st.execute("use " + dbName);
         }
     }

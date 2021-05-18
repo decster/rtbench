@@ -1,11 +1,11 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
 import java.util.Random;
 
-import com.decster.rtbench.DataOperation;
-import com.decster.rtbench.Locations;
-import com.decster.rtbench.Utils;
-import com.decster.rtbench.WorkloadHandler;
+import com.dorisdb.rtbench.DataOperation;
+import com.dorisdb.rtbench.Locations;
+import com.dorisdb.rtbench.Utils;
+import com.dorisdb.rtbench.WorkloadHandler;
 import com.typesafe.config.Config;
 
 public class Merchants {
@@ -56,7 +56,7 @@ public class Merchants {
                 + "country varchar(64) not null,"
                 + "phone varchar(32)";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            ret += ") primary key(id) ";
+            ret += ") unique key(id) ";
             ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d"
                     + " PROPERTIES(\"replication_num\" = \"%d\")",
                     conf.getInt("db.merchants.bucket"),

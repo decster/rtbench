@@ -1,7 +1,9 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.Random;
 
 import org.apache.commons.math3.distribution.PoissonDistribution;
 import org.apache.commons.math3.random.Well19937c;
@@ -84,5 +86,15 @@ public class Utils {
         public int next() {
             return poisson.sample() * factor;
         }
+    }
+
+    static final char[] IDCHARS = "abcdefghijklmnopqrstuvwxyzABSDEFGHIJKLMNOPQRSTUVWXYZ1234567890".toCharArray();
+    static String newRandShortID(int len) {
+        Random r = new Random(System.currentTimeMillis());
+        char[] id = new char[len];
+        for (int i = 0;  i < len;  i++) {
+            id[i] = IDCHARS[r.nextInt(IDCHARS.length)];
+        }
+        return new String(id);
     }
 }

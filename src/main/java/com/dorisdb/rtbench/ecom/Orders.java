@@ -1,6 +1,7 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,12 +9,12 @@ import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.decster.rtbench.DataOperation;
-import com.decster.rtbench.IntArray;
-import com.decster.rtbench.LongArray;
-import com.decster.rtbench.Utils;
-import com.decster.rtbench.DataOperation.Op;
-import com.decster.rtbench.Utils.PowerDist;
+import com.dorisdb.rtbench.DataOperation;
+import com.dorisdb.rtbench.IntArray;
+import com.dorisdb.rtbench.LongArray;
+import com.dorisdb.rtbench.Utils;
+import com.dorisdb.rtbench.DataOperation.Op;
+import com.dorisdb.rtbench.Utils.PowerDist;
 import com.typesafe.config.Config;
 
 public class Orders {
@@ -48,7 +49,7 @@ public class Orders {
         this.ordersPerDay = conf.getInt("orders_per_day");
         this.ordersPerSecond = (ordersPerDay / (3600 * 24.0));
         this.curId = 1;
-        this.activeOrders = new OrderArray(ordersPerDay);
+        this.activeOrders = new OrderArray(ordersPerDay * 4);
         nextEventTsIndex = new IntArray[0];
         indexingStartTs = 0;
         indexingEndTs = 0;
@@ -233,6 +234,13 @@ public class Orders {
 //        }
     }
 
+    static Calendar dateFormatCalender = Calendar.getInstance();
+
+    static int getDateInt(int ts) {
+        dateFormatCalender.setTimeInMillis(ts * 1000L);
+        return dateFormatCalender.get(Calendar.YEAR) * 10000 + (dateFormatCalender.get(Calendar.MONTH)+1) * 100 + dateFormatCalender.get(Calendar.DAY_OF_MONTH);
+    }
+
     Order getOrder(Order ret, long id, int orderTs, int curTs) {
         ret.id = id;
         ret.userId = load.users.sample(id);
@@ -242,7 +250,7 @@ public class Orders {
         long rs = Utils.nextRand(id);
         ret.shipMode = "mode" + (rs % 10);
         ret.orderTs = orderTs;
-        ret.orderDate = Integer.parseInt(dateFormatter.format(new Date(ret.orderTs*1000L)));
+        ret.orderDate = getDateInt(ret.orderTs);
         rs = Utils.nextRand(rs);
         ret.paymentTs = ret.orderTs + paymentTime.sample(rs);
         rs = Utils.nextRand(rs);
@@ -272,7 +280,8 @@ public class Orders {
     }
 
     String getCreateTableSql() {
-        String ret = "create table orders (" + "id bigint not null," + "userid bigint not null,"
+        String ret = "create table orders ("
+                + "id bigint not null," + "userid bigint not null,"
                 + "goodid int not null," + "merchantid int not null," + "ship_address varchar(256) not null,"
                 + "ship_mode varchar(32) not null," + "order_date int not null," + "order_ts int not null,"
                 + "payment_ts int null," + "delivery_start_ts int null," + "delivery_finish_ts int null,"

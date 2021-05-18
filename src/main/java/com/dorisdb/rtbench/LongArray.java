@@ -1,4 +1,4 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 import java.util.Arrays;
 
@@ -17,7 +17,8 @@ public class LongArray {
     public void append(long [] src, int start, int len) {
         int newSize = size + len;
         if (newSize > data.length) {
-            long [] newData = new long[Math.max(newSize, newSize / 2 * 3)];
+            int newcap = Math.max(newSize, newSize / 2 * 3);
+            long [] newData = new long[newcap];
             System.arraycopy(this.data, 0, newData, 0, size);
             System.arraycopy(src, start, newData, size, len);
             data = newData;

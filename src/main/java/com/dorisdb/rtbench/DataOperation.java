@@ -1,4 +1,4 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 public class DataOperation {
     public enum Op {

@@ -1,11 +1,11 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
-import com.decster.rtbench.Locations;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.decster.rtbench.SqlOperation;
-import com.decster.rtbench.Workload;
+import com.dorisdb.rtbench.Locations;
+import com.dorisdb.rtbench.SqlOperation;
+import com.dorisdb.rtbench.Workload;
 
 public class EcomWorkload extends Workload {
     private static final Logger LOG = LogManager.getLogger(EcomWorkload.class);

@@ -1,4 +1,4 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
 public class Order {
     public long id;

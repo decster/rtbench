@@ -1,4 +1,4 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;

@@ -1,9 +1,9 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
-import com.decster.rtbench.DataOperation;
-import com.decster.rtbench.Utils;
-import com.decster.rtbench.Utils.PowerDist;
-import com.decster.rtbench.WorkloadHandler;
+import com.dorisdb.rtbench.DataOperation;
+import com.dorisdb.rtbench.Utils;
+import com.dorisdb.rtbench.WorkloadHandler;
+import com.dorisdb.rtbench.Utils.PowerDist;
 import com.typesafe.config.Config;
 
 public class Goods {
@@ -69,7 +69,7 @@ public class Goods {
                 + "brand varchar(64) not null,"
                 + "type varchar(64) not null";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            ret += ") primary key(id) ";
+            ret += ") unique key(id) ";
             ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d"
                     + " PROPERTIES(\"replication_num\" = \"%d\")",
                     conf.getInt("db.goods.bucket"),

@@ -1,7 +1,7 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
-import com.decster.rtbench.IntArray;
-import com.decster.rtbench.LongArray;
+import com.dorisdb.rtbench.IntArray;
+import com.dorisdb.rtbench.LongArray;
 
 public class OrderArray {
     LongArray data;

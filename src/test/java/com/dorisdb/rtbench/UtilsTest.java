@@ -1,7 +1,9 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
+
+import com.dorisdb.rtbench.Utils;
 
 public class UtilsTest {
     void t(double mean, int t) {

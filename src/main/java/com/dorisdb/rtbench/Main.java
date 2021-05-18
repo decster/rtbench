@@ -1,10 +1,10 @@
-package com.decster.rtbench;
+package com.dorisdb.rtbench;
 import com.typesafe.config.ConfigFactory;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.decster.rtbench.ecom.EcomWorkload;
+import com.dorisdb.rtbench.ecom.EcomWorkload;
 import com.typesafe.config.Config;
 
 public class Main {
@@ -18,8 +18,12 @@ public class Main {
         LOG.info("Handler: " + handlerType);
         if (handlerType.equals("mysql")) {
             handler = new MysqlHandler();
-        } else {
+        } else if (handlerType.equals("dorisdb")){
+            handler = new DorisDBHandler();
+        } else if (handlerType.equals("file")) {
             handler = new FileHandler();
+        } else {
+            throw new Exception("bad handler type: " + handlerType);
         }
         workload.init(conf, handler);
         handler.init(conf, workload);

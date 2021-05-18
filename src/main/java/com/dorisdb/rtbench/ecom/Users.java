@@ -1,9 +1,9 @@
-package com.decster.rtbench.ecom;
+package com.dorisdb.rtbench.ecom;
 
-import com.decster.rtbench.DataOperation;
-import com.decster.rtbench.Locations;
-import com.decster.rtbench.Utils;
-import com.decster.rtbench.WorkloadHandler;
+import com.dorisdb.rtbench.DataOperation;
+import com.dorisdb.rtbench.Locations;
+import com.dorisdb.rtbench.Utils;
+import com.dorisdb.rtbench.WorkloadHandler;
 import com.typesafe.config.Config;
 
 public class Users {
@@ -15,7 +15,7 @@ public class Users {
         this.load = load;
         this.conf = conf;
         long ordersPerDay = conf.getLong("orders_per_day");
-        this.num = ordersPerDay * 10;
+        this.num = ordersPerDay * 5;
     }
 
     public long size() {
@@ -68,7 +68,7 @@ public class Users {
                 + "province varchar(64) not null,"
                 + "country varchar(64) not null";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            ret += ") primary key(id) ";
+            ret += ") unique key(id) ";
             ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d"
                     + " PROPERTIES(\"replication_num\" = \"%d\")",
                     conf.getInt("db.users.bucket"),

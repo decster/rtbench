@@ -18,6 +18,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.dorisdb.rtbench.DataOperation.Op;
+import com.typesafe.config.Config;
 
 public class DorisStreamLoad {
     Logger LOG = LogManager.getLogger(DorisStreamLoad.class);
@@ -28,6 +29,7 @@ public class DorisStreamLoad {
     String label;
     boolean dryRun;
     String authHeader;
+    String tmpDir;
     File outFile;
     boolean keepFile;
     PrintWriter out;
@@ -35,21 +37,25 @@ public class DorisStreamLoad {
 
     static final String randLabelSuffix = "_" + Utils.newRandShortID(4);
 
-    public DorisStreamLoad(String addr, String db, String table, String label, String tmpDir, boolean keepFile, boolean dryRun) {
-        this.addr = addr;
+    public DorisStreamLoad(Config conf, String db, String table, String label) {
+        this.dryRun = conf.getBoolean("dry_run");
+        this.addr = conf.getString("handler.dorisdb.stream_load.addr");
+        this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
+        this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
+        String user = conf.getString("handler.dorisdb.user");
+        String password = conf.getString("handler.dorisdb.password");
+        this.authHeader = basicAuthHeader(user, password);
         this.db = db;
         this.table = table;
-        this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
-        this.authHeader = basicAuthHeader("root", "");
         this.label = label;
+        this.tmpDir = conf.getString("handler.dorisdb.tmpdir");
         this.outFile = new File(String.format("%s/%s.data", tmpDir, label));
-        this.keepFile = keepFile;
-        this.dryRun = dryRun;
         this.opCount = 0;
     }
 
     public PrintWriter getWriter() throws Exception {
         if (out == null) {
+            new File(tmpDir).mkdirs();
             out = new PrintWriter(this.outFile, StandardCharsets.UTF_8.name());
         }
         return out;

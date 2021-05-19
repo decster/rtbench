@@ -1,6 +1,5 @@
 package com.dorisdb.rtbench;
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -24,13 +23,14 @@ public class DorisDBHandler implements WorkloadHandler {
     boolean streamLoadKeepFile;
     String dbName;
     String curLabel;
-    String tmpDir;
     long loadWait;
 
     Connection getConnection() throws SQLException {
         try {
             String url = conf.getString("handler.dorisdb.url");
-            Connection ret = DriverManager.getConnection(url);
+            String user = conf.getString("handler.dorisdb.user");
+            String password = conf.getString("handler.dorisdb.password");
+            Connection ret = DriverManager.getConnection(url, user, password);
             return ret;
         } catch (SQLException e) {
             LOG.warn("connect to dorisdb failed", e);
@@ -66,13 +66,9 @@ public class DorisDBHandler implements WorkloadHandler {
         this.conf = conf;
         this.load = load;
         this.dryRun = conf.getBoolean("dry_run");
-        this.streamLoadAddr = conf.getString("handler.dorisdb.stream_load.addr");
-        this.streamLoadKeepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
-        this.tmpDir = conf.getString("handler.dorisdb.tmpdir");
         this.loadWait = conf.getDuration("handler.dorisdb.load_wait").toMillis();
         this.dbName = conf.getString("db.name");
         loadByTable = new HashMap<String, DorisStreamLoad>();
-        new File(tmpDir).mkdirs();
     }
 
     @Override
@@ -104,7 +100,7 @@ public class DorisDBHandler implements WorkloadHandler {
         DorisStreamLoad ret = loadByTable.get(table);
         if (ret == null) {
             String label = String.format("load-%s-%s", table, curLabel);
-            ret = new DorisStreamLoad(streamLoadAddr, dbName, table, label, tmpDir, streamLoadKeepFile, dryRun);
+            ret = new DorisStreamLoad(conf,  dbName, table, label);
             loadByTable.put(table, ret);
         }
         return ret;

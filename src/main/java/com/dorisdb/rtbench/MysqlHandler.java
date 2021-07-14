@@ -105,7 +105,7 @@ public class MysqlHandler implements WorkloadHandler {
         }
         String sql = batchSB.toString();
         if (dryRun) {
-            LOG.info("sql batch: " + sql);
+            LOG.info(sql.length() < 80 ? sql : sql.substring(0, 80));
         } else {
             st.execute(sql);
         }

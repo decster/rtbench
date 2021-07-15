@@ -63,6 +63,7 @@ public class DorisStreamLoad {
 
     static final char FIELD_SEP = '\001';
     static final char [] NULL_FIELD = new char[] {'\\', 'N'};
+    static String [] columnNames = null;
 
     public void addData(DataOperation op) throws Exception {
         opCount++;
@@ -70,7 +71,10 @@ public class DorisStreamLoad {
             return;
         }
         PrintWriter out = getWriter();
-        if (op.op == Op.INSERT || op.op == Op.UPSERT) {
+        if (columnNames == null) {
+            columnNames = op.fullFieldNames.clone();
+        }
+        if (op.op == Op.INSERT || op.op == Op.UPSERT || op.op == Op.DELETE) {
             for (int i=0;i<op.fullFields.length;i++) {
                 if (i > 0) {
                     out.append(FIELD_SEP);
@@ -86,10 +90,28 @@ public class DorisStreamLoad {
                     out.write(NULL_FIELD);
                 }
             }
+            out.append(FIELD_SEP);
+            out.append(op.op == Op.DELETE ? '1' : '0');
             out.append('\n');
         } else {
             throw new Exception("op type not support");
         }
+    }
+
+    static String getColumnMappingExpr(String[] colNames) {
+        StringBuilder sb = new StringBuilder();
+        for (int i=0;i<colNames.length+1;i++) {
+            sb.append("srccol" + i);
+            sb.append(',');
+        }
+        for (int i=0;i<colNames.length;i++) {
+            sb.append(colNames[i]);
+            sb.append('=');
+            sb.append("srccol"+i);
+            sb.append(',');
+        }
+        sb.append("__op=srccol" + colNames.length);
+        return sb.toString();
     }
 
     public void send() throws Exception {
@@ -113,6 +135,10 @@ public class DorisStreamLoad {
             put.setHeader("label", label + randLabelSuffix);
             put.setHeader("format", "csv");
             put.setHeader("column_separator", "\\x01");
+            if (columnNames != null) {
+                String columnMapping = getColumnMappingExpr(columnNames);
+                put.setHeader("columns", columnMapping);
+            }
             put.setEntity(new FileEntity(outFile));
             CloseableHttpResponse response = client.execute(put);
             final int status = response.getStatusLine().getStatusCode();

@@ -46,7 +46,7 @@ public class Orders {
     public Orders(EcomWorkload load, Config conf) {
         this.load = load;
         this.conf = conf;
-        this.ordersPerDay = conf.getInt("orders_per_day");
+        this.ordersPerDay = conf.getInt("record_per_day");
         this.ordersPerSecond = (ordersPerDay / (3600 * 24.0));
         this.curId = 1;
         this.activeOrders = new OrderArray(ordersPerDay * 4);

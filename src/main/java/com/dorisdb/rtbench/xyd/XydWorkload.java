@@ -25,21 +25,22 @@ public class XydWorkload extends Workload {
         handler.onSqlOperation(new SqlOperation(String.format("create database if not exists %s", dbName)));
         handler.onSqlOperation(new SqlOperation("use " + dbName));
         if (conf.getBoolean("cleanup")) {
-            handler.onSqlOperation(new SqlOperation("drop table if exists " + installments.tableName));
+            //handler.onSqlOperation(new SqlOperation("drop table if exists " + installments.tableName));
             handler.onSqlOperation(new SqlOperation("drop table if exists " + payments.tableName));
         }
-        handler.onSqlOperation(new SqlOperation(installments.getCreateTableSql()));
+        //handler.onSqlOperation(new SqlOperation(installments.getCreateTableSql()));
         handler.onSqlOperation(new SqlOperation(payments.getCreateTableSql()));
         handler.flush();
     }
 
     @Override
     public void processEpoch(long id, long epochTs, long duration) throws Exception {
-        installments.processEpoch((int)epochTs, (int)duration);
+        //installments.processEpoch((int)epochTs, (int)duration);
         payments.processEpoch((int)epochTs, (int)duration);
     }
 
     @Override
     public void close() {
     }
+
 }

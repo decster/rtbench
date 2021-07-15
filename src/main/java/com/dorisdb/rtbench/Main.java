@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.dorisdb.rtbench.ecom.EcomWorkload;
+import com.dorisdb.rtbench.xyd.XydWorkload;
 import com.typesafe.config.Config;
 
 public class Main {
@@ -12,7 +13,15 @@ public class Main {
 
     public static void main(String [] args) throws Exception {
         Config conf = ConfigFactory.load();
-        EcomWorkload workload = new EcomWorkload();
+        Workload workload;
+        String workloadName = conf.getString("workload");
+        if (workloadName.equals("ecom")) {
+            workload = new EcomWorkload();
+        } else if (workloadName.equals("xyd")) {
+            workload = new XydWorkload();
+        } else {
+            throw new Exception("workload not found: " + workloadName);
+        }
         WorkloadHandler handler;
         String handlerType = conf.getString("handler.type");
         LOG.info("Handler: " + handlerType);

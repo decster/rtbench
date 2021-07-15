@@ -97,4 +97,23 @@ public class Utils {
         }
         return new String(id);
     }
+
+    public static SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+    public static long dateToTs(String date) {
+        try {
+            return dateFormatter.parse(date).getTime();
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    public static SimpleDateFormat dateTimeFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    public static long dateTimeToTs(String dateTime) {
+        try {
+            return dateTimeFormatter.parse(dateTime).getTime();
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
 }

@@ -1,8 +1,22 @@
 package com.dorisdb.rtbench.xyd;
 
+import static com.dorisdb.rtbench.schema.Columns.DATE;
+import static com.dorisdb.rtbench.schema.Columns.DATETIME;
+import static com.dorisdb.rtbench.schema.Columns.DECIMAL;
+import static com.dorisdb.rtbench.schema.Columns.DOUBLE;
+import static com.dorisdb.rtbench.schema.Columns.IDINT;
+import static com.dorisdb.rtbench.schema.Columns.INT;
+import static com.dorisdb.rtbench.schema.Columns.STRING;
+import static com.dorisdb.rtbench.schema.Columns.TINYINT;
+import static com.dorisdb.rtbench.schema.Columns.U;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.dorisdb.rtbench.DataOperation;
+import com.dorisdb.rtbench.IntArray;
+import com.dorisdb.rtbench.DataOperation.Op;
+import com.dorisdb.rtbench.schema.Schema;
 import com.typesafe.config.Config;
 
 public class Installments {
@@ -10,37 +24,88 @@ public class Installments {
 
     XydWorkload load;
     Config conf;
-    int ordersPerDay;
-    double ordersPerSecond;
+    int entryPerDay;
+    double entryPerSecond;
+    double deleteRatio = 0.02f;
+    double updateRatio = 0.2f;
     String tableName;
+    Schema schema;
+    IntArray ids;
+    int curId;
 
-    public Installments(XydWorkload load, Config conf) {
+    public Installments(XydWorkload load, Config conf) throws Exception {
         this.load = load;
         this.conf = conf;
         this.tableName = "installments";
-        this.ordersPerDay = conf.getInt("orders_per_day");
-        this.ordersPerSecond = (ordersPerDay / (3600 * 24.0));
+        this.entryPerDay = conf.getInt("record_per_day");
+        this.entryPerSecond = (entryPerDay / (3600 * 24.0));
+        this.ids = new IntArray(0, entryPerDay*2);
+        this.curId = 0;
+        schema = new Schema(
+            IDINT("id"),
+            IDINT("id2"),
+            DATE("setup_due_date", "2020-05-01", 100),
+            DATE("original_due_date", "2020-05-01", 100),
+            DATE("new_due_date", "2020-05-01", 100),
+            DOUBLE("override_original_amount", 10000, 30000, 100.0),
+            DOUBLE("original_principal", 10000, 30000, 100.0),
+            U(DOUBLE("new_principal", 10000, 30000, 100.0)),
+            DOUBLE("original_interest", 300, 1000, 100.0),
+            U(DOUBLE("new_interest", 300, 1000, 100.0))
+        );
     }
 
-    void processEpoch(int ts, int duration) throws Exception {
-    }
-
-    String getCreateTableSql() {
-        String ret = "create table orders ("
-                + "id bigint not null," + "userid bigint not null,"
-                + "goodid int not null," + "merchantid int not null," + "ship_address varchar(256) not null,"
-                + "ship_mode varchar(32) not null," + "order_date int not null," + "order_ts int not null,"
-                + "payment_ts int null," + "delivery_start_ts int null," + "delivery_finish_ts int null,"
-                + "quantify int not null," + "price int not null," + "discount tinyint not null,"
-                + "revenue int not null," + "state tinyint not null";
-        if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            ret += ") primary key(id) ";
-            ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\")",
-                    conf.getInt("db.orders.bucket"), conf.getInt("db.replication"));
-        } else {
-            ret += ", primary key(id))";
+    int[] generate(int ts, int duration) {
+        int[] ret = new int[(int)(duration*entryPerSecond)];
+        for (int i = 0; i < ret.length; i++) {
+            ret[i] = curId;
+            curId++;
         }
         return ret;
     }
 
+    void processEpoch(int ts, int duration) throws Exception {
+        // TODO(cbl): more reasonable calculation
+        int nDelete = Math.min((int)(entryPerSecond*duration*deleteRatio), (int)(ids.getSize()*deleteRatio));
+        if (nDelete > 0) {
+            int[] deleteIds = ids.sample(nDelete, ts);
+            for (int i=0;i<deleteIds.length;i++) {
+                DataOperation op = new DataOperation();
+                schema.genOp(deleteIds[i], deleteIds[i], 0, op);
+                op.table = tableName;
+                op.op = Op.DELETE;
+                load.handler.onDataOperation(op);
+            }
+            ids.remove(deleteIds);
+        }
+        // TODO(cbl): more reasonable calculation
+        int nUpdate = Math.min((int)(entryPerSecond*duration*updateRatio), (int)(ids.getSize()*updateRatio));
+        if (nUpdate > 0) {
+            int[] updateIds = ids.sample(nUpdate, ts);
+            for (int i=0;i<updateIds.length;i++) {
+                DataOperation op = new DataOperation();
+                schema.genOp(updateIds[i], updateIds[i], ts, op);
+                op.table = tableName;
+                op.op = Op.UPSERT;
+                load.handler.onDataOperation(op);
+            }
+        }
+        int[] newIds = generate(ts, duration);
+        for (int i=0;i<newIds.length;i++) {
+            DataOperation op = new DataOperation();
+            schema.genOp(newIds[i], newIds[i], 0, op);
+            op.table = tableName;
+            op.op = Op.INSERT;
+            load.handler.onDataOperation(op);
+        }
+        ids.append(newIds, 0, newIds.length);
+    }
+
+    String getCreateTableSql() {
+        if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
+            return schema.getCreateTableDorisDB(tableName, conf.getInt("db.installments.bucket"), conf.getInt("db.replication"));
+        } else {
+            return schema.getCreateTableMySql(tableName);
+        }
+    }
 }

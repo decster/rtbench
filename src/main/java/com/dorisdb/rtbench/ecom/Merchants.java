@@ -17,7 +17,7 @@ public class Merchants {
     public Merchants(EcomWorkload load, Config conf) {
         this.load = load;
         this.conf = conf;
-        long ordersPerDay = conf.getLong("orders_per_day");
+        long ordersPerDay = conf.getLong("record_per_day");
         this.num = ordersPerDay / 100;
     }
 

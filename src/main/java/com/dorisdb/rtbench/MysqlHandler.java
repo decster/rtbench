@@ -34,8 +34,42 @@ public class MysqlHandler implements WorkloadHandler {
             batchSB.append("insert into ");
             batchSB.append(batchFirst.table);
             batchSB.append(" values ");
+        } else if (batchFirst.op == Op.DELETE) {
+            batchSB.append("delete from ");
+            batchSB.append(batchFirst.table);
+            if (batchFirst.keyFieldIdxs.length == 1) {
+                batchSB.append(" where ");
+                batchSB.append(batchFirst.fullFieldNames[batchFirst.keyFieldIdxs[0]]);
+                batchSB.append(" in (");
+            } else {
+                batchSB.append(" where (");
+                for (int i=0;i<batchFirst.keyFieldIdxs.length;i++) {
+                    if (i>0) {
+                        batchSB.append(",");
+                    }
+                    batchSB.append(batchFirst.fullFieldNames[batchFirst.keyFieldIdxs[i]]);
+                }
+                batchSB.append(") in (");
+            }
         } else {
             throw new Exception("op not supported");
+        }
+    }
+
+    static void appendObj(StringBuilder batchSB, Object f) {
+        if (f != null) {
+            if (f instanceof String) {
+                batchSB.append('\'');
+                // TODO: escape
+                batchSB.append((String)f);
+                batchSB.append('\'');
+            } else if (f instanceof Number) {
+                batchSB.append(f.toString());
+            } else {
+                batchSB.append(f.toString());
+            }
+        } else {
+            batchSB.append("NULL");
         }
     }
 
@@ -49,23 +83,25 @@ public class MysqlHandler implements WorkloadHandler {
                 if (i > 0) {
                     batchSB.append(',');
                 }
-                Object f = op.fullFields[i];
-                if (f != null) {
-                    if (f instanceof String) {
-                        batchSB.append('\'');
-                        // TODO: escape
-                        batchSB.append((String)f);
-                        batchSB.append('\'');
-                    } else if (f instanceof Number) {
-                        batchSB.append(f.toString());
-                    } else {
-                        batchSB.append(f.toString());
-                    }
-                } else {
-                    batchSB.append("NULL");
-                }
+                appendObj(batchSB, op.fullFields[i]);
             }
             batchSB.append(")");
+        } else if (batchFirst.op == Op.DELETE) {
+            if (curBatchSize > 0) {
+                batchSB.append(',');
+            }
+            if (batchFirst.keyFieldIdxs.length == 1) {
+                appendObj(batchSB, op.fullFields[batchFirst.keyFieldIdxs[0]]);
+            } else {
+                batchSB.append("(");
+                for (int i=0;i<batchFirst.keyFieldIdxs.length;i++) {
+                    if (i>0) {
+                        batchSB.append(",");
+                    }
+                    appendObj(batchSB, op.fullFields[batchFirst.keyFieldIdxs[i]]);
+                }
+                batchSB.append(")");
+            }
         } else {
             throw new Exception("op not supported");
         }
@@ -98,10 +134,10 @@ public class MysqlHandler implements WorkloadHandler {
                 batchSB.append(name);
 
             }
+        } else if (batchFirst.op == Op.DELETE) {
+            batchSB.append(")");
         } else if (batchFirst.op == Op.UPDATE) {
             throw new Exception("op UPDATE not supported");
-        } else if (batchFirst.op == Op.DELETE) {
-            throw new Exception("op DELETE not supported");
         }
         String sql = batchSB.toString();
         if (dryRun) {

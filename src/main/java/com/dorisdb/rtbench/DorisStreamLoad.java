@@ -28,6 +28,7 @@ public class DorisStreamLoad {
     String url;
     String label;
     boolean dryRun;
+    boolean withDelete;
     String authHeader;
     String tmpDir;
     File outFile;
@@ -39,6 +40,7 @@ public class DorisStreamLoad {
 
     public DorisStreamLoad(Config conf, String db, String table, String label) {
         this.dryRun = conf.getBoolean("dry_run");
+        this.withDelete = conf.getBoolean("with_delete");
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
@@ -90,8 +92,12 @@ public class DorisStreamLoad {
                     out.write(NULL_FIELD);
                 }
             }
-            out.append(FIELD_SEP);
-            out.append(op.op == Op.DELETE ? '1' : '0');
+            if (withDelete) {
+                out.append(FIELD_SEP);
+                out.append(op.op == Op.DELETE ? '1' : '0');
+            } else if (op.op == Op.DELETE) {
+                throw new IllegalArgumentException("workload should not have delete ops");
+            }
             out.append('\n');
         } else {
             throw new Exception("op type not support");
@@ -135,7 +141,7 @@ public class DorisStreamLoad {
             put.setHeader("label", label + randLabelSuffix);
             put.setHeader("format", "csv");
             put.setHeader("column_separator", "\\x01");
-            if (columnNames != null) {
+            if (withDelete && columnNames != null) {
                 String columnMapping = getColumnMappingExpr(columnNames);
                 put.setHeader("columns", columnMapping);
             }

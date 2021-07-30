@@ -16,6 +16,7 @@ public class Payments {
 
     XydWorkload load;
     Config conf;
+    boolean withDelete;
     int entryPerDay;
     double entryPerSecond;
     double deleteRatio = 0.02f;
@@ -28,6 +29,7 @@ public class Payments {
     public Payments(XydWorkload load, Config conf) throws Exception {
         this.load = load;
         this.conf = conf;
+        this.withDelete = conf.getBoolean("with_delete");
         this.tableName = "payments";
         this.entryPerDay = conf.getInt("record_per_day");
         this.entryPerSecond = (entryPerDay / (3600 * 24.0));
@@ -75,18 +77,21 @@ public class Payments {
     }
 
     void processEpoch(int ts, int duration) throws Exception {
-        // TODO(cbl): more reasonable calculation
-        int nDelete = Math.min((int)(entryPerSecond*duration*deleteRatio), (int)(ids.getSize()*deleteRatio));
-        if (nDelete > 0) {
-            int[] deleteIds = ids.sample(nDelete, ts);
-            for (int i=0;i<deleteIds.length;i++) {
-                DataOperation op = new DataOperation();
-                schema.genOp(deleteIds[i], deleteIds[i], 0, op);
-                op.table = tableName;
-                op.op = Op.DELETE;
-                load.handler.onDataOperation(op);
+        int nDelete = 0;
+        if (withDelete) {
+            // TODO(cbl): more reasonable calculation
+            nDelete = Math.min((int)(entryPerSecond*duration*deleteRatio), (int)(ids.getSize()*deleteRatio));
+            if (nDelete > 0) {
+                int[] deleteIds = ids.sample(nDelete, ts);
+                for (int i=0;i<deleteIds.length;i++) {
+                    DataOperation op = new DataOperation();
+                    schema.genOp(deleteIds[i], deleteIds[i], 0, op);
+                    op.table = tableName;
+                    op.op = Op.DELETE;
+                    load.handler.onDataOperation(op);
+                }
+                ids.remove(deleteIds);
             }
-            ids.remove(deleteIds);
         }
         // TODO(cbl): more reasonable calculation
         int nUpdate = Math.min((int)(entryPerSecond*duration*updateRatio), (int)(ids.getSize()*updateRatio));

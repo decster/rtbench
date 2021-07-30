@@ -292,7 +292,7 @@ public class Orders {
                 + "quantify int not null," + "price int not null," + "discount tinyint not null,"
                 + "revenue int not null," + "state tinyint not null";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            ret += ") primary key(id) ";
+            ret += String.format(") %s key(id) ", conf.getString("handler.dorisdb.table_key_type")) ;
             ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\")",
                     conf.getInt("db.orders.bucket"), conf.getInt("db.replication"));
         } else {

@@ -22,6 +22,7 @@ public class EcomWorkload extends Workload {
 
     @Override
     public void setup() throws Exception {
+        boolean allTable = conf.getBoolean("ecom.all_table");
         locations = new Locations(conf);
         users = new Users(this, conf);
         merchants = new Merchants(this, conf);
@@ -31,24 +32,30 @@ public class EcomWorkload extends Workload {
         handler.onSqlOperation(new SqlOperation(String.format("create database if not exists %s", dbName)));
         handler.onSqlOperation(new SqlOperation("use " + dbName));
         if (conf.getBoolean("cleanup")) {
-            handler.onSqlOperation(new SqlOperation("drop table if exists " + Users.tableName));
-            handler.onSqlOperation(new SqlOperation("drop table if exists " + Merchants.tableName));
-            handler.onSqlOperation(new SqlOperation("drop table if exists " + Goods.tableName));
+            if (allTable) {
+                handler.onSqlOperation(new SqlOperation("drop table if exists " + Users.tableName));
+                handler.onSqlOperation(new SqlOperation("drop table if exists " + Merchants.tableName));
+                handler.onSqlOperation(new SqlOperation("drop table if exists " + Goods.tableName));
+            }
             handler.onSqlOperation(new SqlOperation("drop table if exists " + Orders.tableName));
         }
-        handler.onSqlOperation(new SqlOperation(users.getCreateTableSql()));
-        handler.onSqlOperation(new SqlOperation(merchants.getCreateTableSql()));
-        handler.onSqlOperation(new SqlOperation(goods.getCreateTableSql()));
+        if (allTable) {
+            handler.onSqlOperation(new SqlOperation(users.getCreateTableSql()));
+            handler.onSqlOperation(new SqlOperation(merchants.getCreateTableSql()));
+            handler.onSqlOperation(new SqlOperation(goods.getCreateTableSql()));
+        }
         handler.onSqlOperation(new SqlOperation(orders.getCreateTableSql()));
-        LOG.info("load users table data: " + users.size());
-        users.loadAllData(handler);
-        handler.flush();
-        LOG.info("load merchants table data: " + merchants.size());
-        merchants.loadAllData(handler);
-        handler.flush();
-        LOG.info("load goods table data: " + goods.size());
-        goods.loadAllData(handler);
-        handler.flush();
+        if (allTable) {
+            LOG.info("load users table data: " + users.size());
+            users.loadAllData(handler);
+            handler.flush();
+            LOG.info("load merchants table data: " + merchants.size());
+            merchants.loadAllData(handler);
+            handler.flush();
+            LOG.info("load goods table data: " + goods.size());
+            goods.loadAllData(handler);
+            handler.flush();
+        }
     }
 
     @Override

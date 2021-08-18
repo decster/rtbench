@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -20,7 +21,7 @@ import org.apache.logging.log4j.Logger;
 import com.dorisdb.rtbench.DataOperation.Op;
 import com.typesafe.config.Config;
 
-public class DorisStreamLoad {
+public class DorisStreamLoad implements DorisLoad {
     Logger LOG = LogManager.getLogger(DorisStreamLoad.class);
     String addr;
     String db;
@@ -35,6 +36,8 @@ public class DorisStreamLoad {
     boolean keepFile;
     PrintWriter out;
     long opCount;
+    int retry = 0;
+    long retrySleepSec = 3;
 
     static final String randLabelSuffix = "_" + Utils.newRandShortID(4);
 
@@ -44,6 +47,8 @@ public class DorisStreamLoad {
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
+        this.retry = conf.getInt("handler.dorisdb.load.retry");
+        this.retrySleepSec = conf.getDuration("handler.dorisdb.load.retry_sleep", TimeUnit.SECONDS);
         String user = conf.getString("handler.dorisdb.user");
         String password = conf.getString("handler.dorisdb.password");
         this.authHeader = basicAuthHeader(user, password);
@@ -53,6 +58,14 @@ public class DorisStreamLoad {
         this.tmpDir = conf.getString("handler.dorisdb.tmpdir");
         this.outFile = new File(String.format("%s/%s.data", tmpDir, label));
         this.opCount = 0;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public long getOpCount() {
+        return opCount;
     }
 
     public PrintWriter getWriter() throws Exception {
@@ -120,40 +133,67 @@ public class DorisStreamLoad {
         return sb.toString();
     }
 
+    static boolean resultOK(String result) {
+        if (result.contains("OK")) {
+            return true;
+        }
+        if (result.contains("Label Already Exists") && result.contains("FINISHED")) {
+            return true;
+        }
+        return false;
+    }
+
+    private void sendInner() throws Exception {
+        final HttpClientBuilder httpClientBuilder = HttpClients
+                .custom()
+                .setRedirectStrategy(new DefaultRedirectStrategy() {
+                    @Override
+                    protected boolean isRedirectable(String method) {
+                        return true;
+                    }
+                });
+        CloseableHttpClient client = httpClientBuilder.build();
+        HttpPut put = new HttpPut(url);
+        put.setHeader(HttpHeaders.EXPECT, "100-continue");
+        put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        put.setHeader("label", label + randLabelSuffix);
+        put.setHeader("format", "csv");
+        put.setHeader("column_separator", "\\x01");
+        if (withDelete && columnNames != null) {
+            String columnMapping = getColumnMappingExpr(columnNames);
+            put.setHeader("columns", columnMapping);
+        }
+        put.setEntity(new FileEntity(outFile));
+        CloseableHttpResponse response = client.execute(put);
+        final int status = response.getStatusLine().getStatusCode();
+        String result = "null";
+        if (response.getEntity() != null) {
+            result =  EntityUtils.toString(response.getEntity());
+        }
+        if (status != 200 || !resultOK(result)) {
+            throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", db, table, label, result));
+        }
+    }
+
     public void send() throws Exception {
         if (out == null) {
             return;
         }
         try {
             out.close();
-            final HttpClientBuilder httpClientBuilder = HttpClients
-                    .custom()
-                    .setRedirectStrategy(new DefaultRedirectStrategy() {
-                        @Override
-                        protected boolean isRedirectable(String method) {
-                            return true;
-                        }
-                    });
-            CloseableHttpClient client = httpClientBuilder.build();
-            HttpPut put = new HttpPut(url);
-            put.setHeader(HttpHeaders.EXPECT, "100-continue");
-            put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
-            put.setHeader("label", label + randLabelSuffix);
-            put.setHeader("format", "csv");
-            put.setHeader("column_separator", "\\x01");
-            if (withDelete && columnNames != null) {
-                String columnMapping = getColumnMappingExpr(columnNames);
-                put.setHeader("columns", columnMapping);
-            }
-            put.setEntity(new FileEntity(outFile));
-            CloseableHttpResponse response = client.execute(put);
-            final int status = response.getStatusLine().getStatusCode();
-            String result = "null";
-            if (response.getEntity() != null) {
-                result =  EntityUtils.toString(response.getEntity());
-            }
-            if (status != 200 || !result.contains("OK")) {
-                throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", db, table, label, result));
+            while (true) {
+                try {
+                    sendInner();
+                    break;
+                } catch (Exception e) {
+                    if (retry > 0) {
+                        LOG.info(String.format("%s sleep %dsec and retry", e.getMessage(), retrySleepSec));
+                        Thread.sleep(retrySleepSec * 1000);
+                        retry--;
+                    } else {
+                        throw e;
+                    }
+                }
             }
         } finally {
             if (!keepFile) {

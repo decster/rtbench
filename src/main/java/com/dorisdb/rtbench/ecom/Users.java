@@ -15,7 +15,7 @@ public class Users {
         this.load = load;
         this.conf = conf;
         long ordersPerDay = conf.getLong("record_per_day");
-        this.num = ordersPerDay * 5;
+        this.num = ordersPerDay;
     }
 
     public long size() {

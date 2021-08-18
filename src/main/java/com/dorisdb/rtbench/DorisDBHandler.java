@@ -24,6 +24,7 @@ public class DorisDBHandler implements WorkloadHandler {
     String dbName;
     String curLabel;
     long loadWait;
+    int loadConcurrency;
 
     Connection getConnection() throws SQLException {
         try {
@@ -68,7 +69,8 @@ public class DorisDBHandler implements WorkloadHandler {
         this.dryRun = conf.getBoolean("dry_run");
         this.loadWait = conf.getDuration("handler.dorisdb.load_wait").toMillis();
         this.dbName = conf.getString("db.name");
-        loadByTable = new HashMap<String, DorisStreamLoad>();
+        this.loadConcurrency = conf.getInt("handler.dorisdb.load_concurrency");
+        loadByTable = new HashMap<String, DorisLoad>();
     }
 
     @Override
@@ -81,26 +83,30 @@ public class DorisDBHandler implements WorkloadHandler {
         }
     }
 
-    Map<String, DorisStreamLoad> loadByTable;
+    Map<String, DorisLoad> loadByTable;
 
     void executeAndClearAllLoads() throws Exception {
-        for (Map.Entry<String, DorisStreamLoad> e : loadByTable.entrySet()) {
-            DorisStreamLoad load = e.getValue();
-            LOG.info(String.format("stream load %s op:%d start", load.label, load.opCount));
+        for (Map.Entry<String, DorisLoad> e : loadByTable.entrySet()) {
+            DorisLoad load = e.getValue();
+            LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
             long t0 = System.nanoTime();
             load.send();
             long t1 = System.nanoTime();
-            LOG.info(String.format("stream load %s op:%d done %.2fs", load.label, load.opCount, (t1-t0) / 1000000000.0));
+            LOG.info(String.format("stream load %s op:%d done %.2fs", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000000.0));
             Thread.sleep(loadWait);
         }
         loadByTable.clear();
     }
 
-    DorisStreamLoad getLoad(String table) {
-        DorisStreamLoad ret = loadByTable.get(table);
+    DorisLoad getLoad(String table) {
+        DorisLoad ret = loadByTable.get(table);
         if (ret == null) {
             String label = String.format("load-%s-%s", table, curLabel);
-            ret = new DorisStreamLoad(conf,  dbName, table, label);
+            if (loadConcurrency == 1) {
+                ret = new DorisStreamLoad(conf,  dbName, table, label);
+            } else {
+                ret = new ConcurrentDorisStreamLoad(conf,  dbName, table, label, loadConcurrency);
+            }
             loadByTable.put(table, ret);
         }
         return ret;
@@ -108,7 +114,7 @@ public class DorisDBHandler implements WorkloadHandler {
 
     @Override
     public void onDataOperation(DataOperation op) throws Exception {
-        DorisStreamLoad load = getLoad(op.table);
+        DorisLoad load = getLoad(op.table);
         load.addData(op);
     }
 

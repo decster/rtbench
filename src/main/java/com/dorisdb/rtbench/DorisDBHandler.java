@@ -20,6 +20,7 @@ public class DorisDBHandler implements WorkloadHandler {
     Connection con;
     Statement st;
     boolean dryRun;
+    boolean recordMaxVersionCount;
     String streamLoadAddr;
     boolean streamLoadKeepFile;
     String dbName;
@@ -68,6 +69,7 @@ public class DorisDBHandler implements WorkloadHandler {
         this.conf = conf;
         this.load = load;
         this.dryRun = conf.getBoolean("dry_run");
+        this.recordMaxVersionCount = conf.getBoolean("handler.dorisdb.record_max_version_count");
         this.loadWait = conf.getDuration("handler.dorisdb.load_wait").toMillis();
         this.dbName = conf.getString("db.name");
         this.loadConcurrency = conf.getInt("handler.dorisdb.load_concurrency");
@@ -92,21 +94,25 @@ public class DorisDBHandler implements WorkloadHandler {
             LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
             long t0 = System.nanoTime();
             load.send();
-            st.execute(String.format("use " + dbName));
-            st.execute(String.format("show tablet from %s", load.getTable()));
-            java.lang.Long versionCount = 0L;
-            java.sql.ResultSet rs = st.getResultSet();
-            while (rs.next()) {
-                versionCount += rs.getLong("VersionCount");
-            }
-            if (maxVersionCount < versionCount) {
-                maxVersionCount = versionCount;
+            if (recordMaxVersionCount) {
+                st.execute(String.format("use " + dbName));
+                st.execute(String.format("show tablet from %s", load.getTable()));
+                java.lang.Long versionCount = 0L;
+                java.sql.ResultSet rs = st.getResultSet();
+                while (rs.next()) {
+                    versionCount += rs.getLong("VersionCount");
+                }
+                if (maxVersionCount < versionCount) {
+                    maxVersionCount = versionCount;
+                }
             }
             long t1 = System.nanoTime();
             LOG.info(String.format("stream load %s op:%d done %.2fs", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000000.0));
             Thread.sleep(loadWait);
         }
-        LOG.info(String.format("maxVersionCount: %d", maxVersionCount));
+        if (recordMaxVersionCount) {
+            LOG.info(String.format("maxVersionCount: %d", maxVersionCount));
+        }
         loadByTable.clear();
     }
 

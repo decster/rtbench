@@ -165,6 +165,14 @@ public class DorisDBHandler implements WorkloadHandler {
 
     @Override
     public void onClose() throws Exception {
+        if (conf.getBoolean("handler.dorisdb.query_after_large_quantity_versions")) {
+            long t0 = System.nanoTime();
+            st.execute(String.format("use " + dbName));
+            String sql = String.format("select merchantid, sum(revenue) from orders group by merchantid order by sum(revenue) desc limit 10");
+            st.execute(sql);
+            long t1 = System.nanoTime();
+            LOG.info(String.format("onClose: test query for large quantity versions: %s: %.2fms", sql, (t1-t0) / 1000000.0));
+        }
         closeStatement();
     }
 

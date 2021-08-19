@@ -60,6 +60,10 @@ public class DorisStreamLoad implements DorisLoad {
         this.opCount = 0;
     }
 
+    public String getTable() {
+        return table;
+    }
+
     public String getLabel() {
         return label;
     }

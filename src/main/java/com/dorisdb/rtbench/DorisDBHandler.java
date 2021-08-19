@@ -14,6 +14,7 @@ import com.typesafe.config.Config;
 
 public class DorisDBHandler implements WorkloadHandler {
     private static final Logger LOG = LogManager.getLogger(DorisDBHandler.class);
+    private static java.lang.Long maxVersionCount = 0L;
     Config conf;
     Workload load;
     Connection con;
@@ -91,10 +92,21 @@ public class DorisDBHandler implements WorkloadHandler {
             LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
             long t0 = System.nanoTime();
             load.send();
+            st.execute(String.format("use " + dbName));
+            st.execute(String.format("show tablet from %s", load.getTable()));
+            java.lang.Long versionCount = 0L;
+            java.sql.ResultSet rs = st.getResultSet();
+            while (rs.next()) {
+                versionCount += rs.getLong("VersionCount");
+            }
+            if (maxVersionCount < versionCount) {
+                maxVersionCount = versionCount;
+            }
             long t1 = System.nanoTime();
             LOG.info(String.format("stream load %s op:%d done %.2fs", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000000.0));
             Thread.sleep(loadWait);
         }
+        LOG.info(String.format("maxVersionCount: %d", maxVersionCount));
         loadByTable.clear();
     }
 

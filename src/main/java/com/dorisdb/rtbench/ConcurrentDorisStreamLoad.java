@@ -7,6 +7,7 @@ import com.typesafe.config.Config;
 
 public class ConcurrentDorisStreamLoad implements DorisLoad {
     Logger LOG = LogManager.getLogger(ConcurrentDorisStreamLoad.class);
+    String table;
     int numShard;
     String label;
     long opCount = 0;
@@ -15,6 +16,7 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
     public ConcurrentDorisStreamLoad(Config conf, String db, String table, String label, int numShard) {
         this.numShard = numShard;
         this.label = label;
+        this.table = table;
         loads = new DorisStreamLoad[numShard];
         for (int i=0;i<numShard;i++) {
             loads[i] = new DorisStreamLoad(conf, db, table, String.format("%s_%d", label, i));
@@ -66,6 +68,10 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
                 throw rets[i];
             }
         }
+    }
+
+    public String getTable() {
+        return table;
     }
 
     public String getLabel() {

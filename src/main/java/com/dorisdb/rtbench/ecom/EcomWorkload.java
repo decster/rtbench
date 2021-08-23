@@ -65,5 +65,18 @@ public class EcomWorkload extends Workload {
 
     @Override
     public void close() {
+        try {
+            if (conf.getBoolean("handler.dorisdb.query_after_large_quantity_versions")) {
+                long t0 = System.nanoTime();
+                handler.onEpochBegin(0, "query on close");
+                handler.onSqlOperation(new SqlOperation("use " + dbName));
+                String sql = String.format("select merchantid, sum(revenue) from orders group by merchantid order by sum(revenue) desc limit 10");
+                handler.onSqlOperation(new SqlOperation(sql));
+                long t1 = System.nanoTime();
+                LOG.info(String.format("onClose: test query for large quantity versions: %s: %.2fms", sql, (t1-t0) / 1000000.0));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

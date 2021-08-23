@@ -35,36 +35,126 @@ public class Payments {
         this.entryPerSecond = (entryPerDay / (3600 * 24.0));
         this.ids = new IntArray(0, entryPerDay*2);
         this.curId = 0;
-        schema = new Schema(
-            IDINT("id"),
-            DATE("setup_due_date", "2020-05-01", 100),
-            DATE("original_due_date", "2020-05-01", 100),
-            DATE("new_due_date", "2020-05-01", 100),
-            DOUBLE("override_original_amount", 10000, 30000, 100.0),
-            DOUBLE("original_amount", 10000, 30000, 100.0),
-            DOUBLE("new_amount", 10000, 30000, 100.0),
-            DOUBLE("original_principal", 10000, 30000, 100.0),
-            U(DOUBLE("new_principal", 10000, 30000, 100.0)),
-            DOUBLE("original_interest", 300, 1000, 100.0),
-            U(DOUBLE("new_interest", 300, 1000, 100.0)),
-            DOUBLE("override_original_principal", 10000, 30000, 100.0),
-            DOUBLE("override_original_interest", 300,1000, 100.0),
-            INT("loan_id", 1, 10000000),
-            INT("transferred_scheduled_payment_id", 1, 10000000),
-            INT("installment_id", 1, 10000000),
-            STRING("set_by", "setby", 1, 10000),
-            TINYINT("is_valid", 0, 2),
-            INT("account_id", 1, 1000000),
-            INT("setup_method_id", 1, 10),
-            DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100),
-            DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("service_charge", 9, 2, 1000, 1000000),
-            DECIMAL("late_fee", 9, 2, 1000, 100000),
-            DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("penalty", 9, 2, 1000, 100000),
-            DECIMAL("default_interest", 9, 2, 300, 1200),
-            U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
-        );
+
+        String schema_type = conf.getString("db.payments.schema_type");
+
+        if (schema_type.equals("ordinary_cols")) {
+            schema = new Schema(
+                IDINT("id"),
+                DATE("setup_due_date", "2020-05-01", 100),
+                DATE("original_due_date", "2020-05-01", 100),
+                DATE("new_due_date", "2020-05-01", 100),
+                DOUBLE("override_original_amount", 10000, 30000, 100.0),
+                DOUBLE("original_amount", 10000, 30000, 100.0),
+                DOUBLE("new_amount", 10000, 30000, 100.0),
+                DOUBLE("original_principal", 10000, 30000, 100.0),
+                U(DOUBLE("new_principal", 10000, 30000, 100.0)),
+                DOUBLE("original_interest", 300, 1000, 100.0),
+                U(DOUBLE("new_interest", 300, 1000, 100.0)),
+                DOUBLE("override_original_principal", 10000, 30000, 100.0),
+                DOUBLE("override_original_interest", 300,1000, 100.0),
+                INT("loan_id", 1, 10000000),
+                INT("transferred_scheduled_payment_id", 1, 10000000),
+                INT("installment_id", 1, 10000000),
+                STRING("set_by", "setby", 1, 10000),
+                TINYINT("is_valid", 0, 2),
+                INT("account_id", 1, 1000000),
+                INT("setup_method_id", 1, 10),
+                DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100),
+                DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100),
+                DECIMAL("service_charge", 9, 2, 1000, 1000000),
+                DECIMAL("late_fee", 9, 2, 1000, 100000),
+                DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100),
+                DECIMAL("penalty", 9, 2, 1000, 100000),
+                DECIMAL("default_interest", 9, 2, 300, 1200),
+                U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
+            );
+        } else if (schema_type.equals("numerous_key_cols")) {
+            schema = new Schema(
+                K(IDINT("id")),
+                K(DATE("setup_due_date0", "2020-05-01", 100)),
+                K(DATE("setup_due_date1", "2020-05-01", 100)),
+                K(DATE("setup_due_date2", "2020-05-01", 100)),
+                K(DATE("original_due_date", "2020-05-01", 100)),
+                K(DATE("new_due_date", "2020-05-01", 100)),
+                K(INT("loan_id", 1, 10000000)),
+                K(INT("transferred_scheduled_payment_id", 1, 10000000)),
+                K(INT("installment_id", 1, 10000000)),
+                K(STRING("set_by", "setby", 1, 10000)),
+                K(TINYINT("is_valid", 0, 2)),
+                K(INT("account_id", 1, 1000000)),
+                K(INT("setup_method_id", 1, 10)),
+                K(DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100)),
+                K(DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100)),
+                K(DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100)),
+                K(U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))),
+                K(DATETIME("schedule_time1", "2020-04-01 00:00:00", 3600*24*100)),
+                K(DATETIME("schedule_time2", "2020-04-01 00:00:00", 3600*24*100)),
+                K(DATETIME("schedule_time3", "2020-04-01 00:00:00", 3600*24*100)),
+                K(DATETIME("schedule_time4", "2020-04-01 00:00:00", 3600*24*100)),
+                DOUBLE("override_original_amount", 10000, 30000, 100.0),
+                DOUBLE("original_amount", 10000, 30000, 100.0),
+                DOUBLE("new_amount", 10000, 30000, 100.0),
+                DOUBLE("original_principal", 10000, 30000, 100.0),
+                U(DOUBLE("new_principal", 10000, 30000, 100.0)),
+                DOUBLE("original_interest", 300, 1000, 100.0),
+                U(DOUBLE("new_interest", 300, 1000, 100.0)),
+                DOUBLE("override_original_principal", 10000, 30000, 100.0),
+                DOUBLE("override_original_interest", 300,1000, 100.0),
+                DECIMAL("service_charge", 9, 2, 1000, 1000000),
+                DECIMAL("late_fee", 9, 2, 1000, 100000),
+                DECIMAL("penalty", 9, 2, 1000, 100000),
+                DECIMAL("default_interest", 9, 2, 300, 1200)
+            );
+        } else if (schema_type.equals("numerous_value_cols")) {
+            java.util.ArrayList<com.dorisdb.rtbench.schema.Column> numerous_cols_list = new java.util.ArrayList<com.dorisdb.rtbench.schema.Column>();
+
+            numerous_cols_list.add(IDINT("id"));
+
+            final int repeat_value_num = 33;
+
+            com.dorisdb.rtbench.schema.Column[] prototypes = {
+                DATE("setup_due_date", "2020-05-01", 100),
+                DATE("original_due_date", "2020-05-01", 100),
+                DATE("new_due_date", "2020-05-01", 100),
+                DOUBLE("override_original_amount", 10000, 30000, 100.0),
+                DOUBLE("original_amount", 10000, 30000, 100.0),
+                DOUBLE("new_amount", 10000, 30000, 100.0),
+                DOUBLE("original_principal", 10000, 30000, 100.0),
+                U(DOUBLE("new_principal", 10000, 30000, 100.0)),
+                DOUBLE("original_interest", 300, 1000, 100.0),
+                U(DOUBLE("new_interest", 300, 1000, 100.0)),
+                DOUBLE("override_original_principal", 10000, 30000, 100.0),
+                DOUBLE("override_original_interest", 300,1000, 100.0),
+                INT("loan_id", 1, 10000000),
+                INT("transferred_scheduled_payment_id", 1, 10000000),
+                INT("installment_id", 1, 10000000),
+                STRING("set_by", "setby", 1, 10000),
+                TINYINT("is_valid", 0, 2),
+                INT("account_id", 1, 1000000),
+                INT("setup_method_id", 1, 10),
+                DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100),
+                DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100),
+                DECIMAL("service_charge", 9, 2, 1000, 1000000),
+                DECIMAL("late_fee", 9, 2, 1000, 100000),
+                DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100),
+                DECIMAL("penalty", 9, 2, 1000, 100000),
+                DECIMAL("default_interest", 9, 2, 300, 1200),
+                U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
+            };
+
+            for (com.dorisdb.rtbench.schema.Column prototype : prototypes) {
+                for (int i = 0; i < repeat_value_num; i++) {
+                    com.dorisdb.rtbench.schema.Column col = (com.dorisdb.rtbench.schema.Column)prototype.clone();
+                    col.setName(String.format("%s%02d", col.name, i));
+                    numerous_cols_list.add(col);
+                }
+            }
+
+            com.dorisdb.rtbench.schema.Column[] numerous_value_cols = new com.dorisdb.rtbench.schema.Column[numerous_cols_list.size()];
+            numerous_value_cols = numerous_cols_list.toArray(numerous_value_cols);
+            schema = new Schema(numerous_value_cols);
+        }
     }
 
     int[] generate(int ts, int duration) {

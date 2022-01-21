@@ -30,6 +30,7 @@ public class DorisStreamLoad implements DorisLoad {
     String label;
     boolean dryRun;
     boolean withDelete;
+    boolean partial_update;
     String authHeader;
     String tmpDir;
     File outFile;
@@ -44,6 +45,7 @@ public class DorisStreamLoad implements DorisLoad {
     public DorisStreamLoad(Config conf, String db, String table, String label) {
         this.dryRun = conf.getBoolean("dry_run");
         this.withDelete = conf.getBoolean("with_delete");
+        this.partial_update = conf.getBoolean("partial_update");
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
@@ -109,7 +111,7 @@ public class DorisStreamLoad implements DorisLoad {
                     out.write(NULL_FIELD);
                 }
             }
-            if (withDelete) {
+            if (!partial_update && withDelete) {
                 out.append(FIELD_SEP);
                 out.append(op.op == Op.DELETE ? '1' : '0');
             } else if (op.op == Op.DELETE) {
@@ -163,7 +165,11 @@ public class DorisStreamLoad implements DorisLoad {
         put.setHeader("label", label + randLabelSuffix);
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");
-        if (withDelete && columnNames != null) {
+        if (partial_update && columnNames != null) {
+            put.setHeader("partial_update", "true");
+            String columnMapping = String.join(",", columnNames[0], columnNames[15]);
+            put.setHeader("columns", columnMapping);
+        } else if (withDelete && columnNames != null) {
             String columnMapping = getColumnMappingExpr(columnNames);
             put.setHeader("columns", columnMapping);
         }

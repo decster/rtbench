@@ -30,6 +30,7 @@ public class Orders {
     int indexingStartTs;
     int indexingEndTs;
     int indexingDuration;
+    boolean partial_update;
 
     static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyyMMdd");
     static final PowerDist paymentTime = new PowerDist(10, 300);
@@ -48,8 +49,9 @@ public class Orders {
         this.conf = conf;
         this.ordersPerDay = conf.getInt("record_per_day");
         this.ordersPerSecond = (ordersPerDay / (3600 * 24.0));
-        this.curId = 1;
+        this.curId = conf.getLong("generator_id_start");
         this.activeOrders = new OrderArray(ordersPerDay * 4);
+        this.partial_update = conf.getBoolean("partial_update");
         nextEventTsIndex = new IntArray[0];
         indexingStartTs = 0;
         indexingEndTs = 0;
@@ -203,24 +205,31 @@ public class Orders {
             }
             op.fullFieldNames = allColumnNames;
             op.keyFieldIdxs = keyColumnIdxs;
-            op.fullFields = new Object[] {
-                order.id,
-                order.userId,
-                order.goodId,
-                order.merchantId,
-                order.shipAddress,
-                order.shipMode,
-                order.orderDate,
-                order.orderTs,
-                order.state >= State.PAYED.ordinal() ? order.paymentTs : null,
-                order.state >= State.DELIVER_STARTED.ordinal() ? order.deliveryStartTs : null,
-                order.state >= State.DELIVER_FINISHED.ordinal() ? order.deliveryFinishTs : null,
-                order.quantity,
-                order.price,
-                order.discount,
-                order.revenue,
-                order.state
-            };
+            if (partial_update) {
+                op.fullFields = new Object[] {
+                    order.id,
+                    order.state
+                };
+            } else {
+                op.fullFields = new Object[] {
+                    order.id,
+                    order.userId,
+                    order.goodId,
+                    order.merchantId,
+                    order.shipAddress,
+                    order.shipMode,
+                    order.orderDate,
+                    order.orderTs,
+                    order.state >= State.PAYED.ordinal() ? order.paymentTs : null,
+                    order.state >= State.DELIVER_STARTED.ordinal() ? order.deliveryStartTs : null,
+                    order.state >= State.DELIVER_FINISHED.ordinal() ? order.deliveryFinishTs : null,
+                    order.quantity,
+                    order.price,
+                    order.discount,
+                    order.revenue,
+                    order.state
+                };
+            }
             load.handler.onDataOperation(op);
             if (order.nextEventTs == 0) {
                 activeOrders.setNextEventTs(idx, order.nextEventTs);
@@ -284,7 +293,7 @@ public class Orders {
     }
 
     String getCreateTableSql() {
-        String ret = "create table orders ("
+        String ret = "create table if not exists orders ("
                 + "id bigint not null," + "userid bigint not null,"
                 + "goodid int not null," + "merchantid int not null," + "ship_address varchar(256) not null,"
                 + "ship_mode varchar(32) not null," + "order_date int not null," + "order_ts int not null,"

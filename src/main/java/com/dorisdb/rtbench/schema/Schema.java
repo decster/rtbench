@@ -82,7 +82,7 @@ public class Schema {
 
     public String getCreateTableDorisDB(String tableName, int bucket, int replication) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("create table %s (", tableName));
+        sb.append(String.format("create table if not exists %s (", tableName));
         for (int i=0;i<columns.length;i++) {
             Column c = columns[i];
             sb.append(String.format("%s%s %s%s", i==0 ? "":",", c.name, c.type, c.nullable ? " NULL" : " NOT NULL"));

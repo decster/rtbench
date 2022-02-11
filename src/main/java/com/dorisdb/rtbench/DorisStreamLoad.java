@@ -31,7 +31,6 @@ public class DorisStreamLoad implements DorisLoad {
     boolean dryRun;
     boolean withDelete;
     boolean partial_update;
-    boolean numerous_columns;
     int[] numerousPartialColumnIdxes;
     String authHeader;
     String tmpDir;
@@ -48,7 +47,6 @@ public class DorisStreamLoad implements DorisLoad {
         this.dryRun = conf.getBoolean("dry_run");
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
-        this.numerous_columns = conf.getBoolean("numerous_columns");
         String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
         this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
         for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
@@ -173,7 +171,7 @@ public class DorisStreamLoad implements DorisLoad {
         put.setHeader("label", label + randLabelSuffix);
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");
-        if (numerous_columns && partial_update) {
+        if (partial_update && numerousPartialColumnIdxes.length != 0) {
             put.setHeader("partial_update", "true");
             String[] partialColumnNames = new String[numerousPartialColumnIdxes.length];
             for (int i = 0; i < numerousPartialColumnIdxes.length; i++) {

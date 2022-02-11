@@ -17,6 +17,9 @@ public class Payments {
     XydWorkload load;
     Config conf;
     boolean withDelete;
+    boolean partial_update;
+    boolean numerous_columns;
+    int[] numerousPartialColumnIdxes;
     int entryPerDay;
     double entryPerSecond;
     double deleteRatio = 0.02f;
@@ -30,6 +33,13 @@ public class Payments {
         this.load = load;
         this.conf = conf;
         this.withDelete = conf.getBoolean("with_delete");
+        this.partial_update = conf.getBoolean("partial_update");
+        this.numerous_columns = conf.getBoolean("numerous_columns");
+        String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
+        this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
+        for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
+            this.numerousPartialColumnIdxes[i] = Integer.parseInt(numerousPartialColumnStrIdxes[i]);
+        }
         this.tableName = "payments";
         this.entryPerDay = conf.getInt("record_per_day");
         this.entryPerSecond = (entryPerDay / (3600 * 24.0));
@@ -175,7 +185,11 @@ public class Payments {
                 int[] deleteIds = ids.sample(nDelete, ts);
                 for (int i=0;i<deleteIds.length;i++) {
                     DataOperation op = new DataOperation();
-                    schema.genOp(deleteIds[i], deleteIds[i], 0, op);
+                    if (numerous_columns && partial_update) {
+                        schema.genOpNumerousColumns(deleteIds[i], deleteIds[i], 0, op, numerousPartialColumnIdxes);
+                    } else {
+                        schema.genOp(deleteIds[i], deleteIds[i], 0, op);
+                    }
                     op.table = tableName;
                     op.op = Op.DELETE;
                     load.handler.onDataOperation(op);
@@ -189,7 +203,11 @@ public class Payments {
             int[] updateIds = ids.sample(nUpdate, ts);
             for (int i=0;i<updateIds.length;i++) {
                 DataOperation op = new DataOperation();
-                schema.genOp(updateIds[i], updateIds[i], ts, op);
+                if (numerous_columns && partial_update) {
+                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, numerousPartialColumnIdxes);
+                } else {
+                    schema.genOp(updateIds[i], updateIds[i], ts, op);
+                }
                 op.table = tableName;
                 op.op = Op.UPSERT;
                 load.handler.onDataOperation(op);
@@ -198,7 +216,11 @@ public class Payments {
         int[] newIds = generate(ts, duration);
         for (int i=0;i<newIds.length;i++) {
             DataOperation op = new DataOperation();
-            schema.genOp(newIds[i], newIds[i], 0, op);
+            if (numerous_columns && partial_update) {
+                schema.genOpNumerousColumns(newIds[i], newIds[i], 0, op, numerousPartialColumnIdxes);
+            } else {
+                schema.genOp(newIds[i], newIds[i], 0, op);
+            }
             op.table = tableName;
             op.op = Op.INSERT;
             load.handler.onDataOperation(op);

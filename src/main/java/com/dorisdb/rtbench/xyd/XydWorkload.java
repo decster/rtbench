@@ -47,7 +47,7 @@ public class XydWorkload extends Workload {
                 handler.onEpochBegin(0, "query on close");
                 handler.onSqlOperation(new SqlOperation("use " + dbName));
                 String sql;
-                if (conf.getString("db.payments.schema_type").equals("ordinary_cols")) {
+                if (conf.getString("db.payments.schema_type").equals("ordinary_cols") || conf.getString("db.payments.schema_type").equals("numerous_key_cols")) {
                     sql = String.format("select account_id, sum(new_amount) from payments group by account_id order by sum(new_amount) desc limit 10");
                 } else {
                     sql = String.format("select account_id00, sum(new_amount00) from payments group by account_id00 order by sum(new_amount00) desc limit 10");

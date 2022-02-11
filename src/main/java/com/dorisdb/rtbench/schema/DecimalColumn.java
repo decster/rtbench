@@ -11,6 +11,7 @@ public class DecimalColumn extends Column {
     public DecimalColumn(String name, int p, int s, int min, int cardinality) {
         this.name = name;
         this.type = String.format("decimal(%d,%d)", p, s);
+        this.defaultStr = "\"10.5\"";
         this.p = p;
         this.s = s;
         for (int i = 0; i<s;i++) {

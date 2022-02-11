@@ -11,6 +11,7 @@ public class DateTimeColumn extends Column {
     public DateTimeColumn(String name, String minDateTime, int seconds) {
         this.name = name;
         this.type = "datetime";
+        this.defaultStr = "\"1970-01-01 15:36:00\"";
         this.min = Utils.dateToTs(minDateTime);
         this.cardinality = seconds;
     }

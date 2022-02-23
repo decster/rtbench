@@ -7,6 +7,7 @@ public class IntColumn extends Column {
     public IntColumn(String name, int min, int cardinality) {
         this.name = name;
         this.type = "int";
+        this.defaultStr = "\"2147483647\"";
         this.min = min;
         this.cardinality = cardinality;
     }

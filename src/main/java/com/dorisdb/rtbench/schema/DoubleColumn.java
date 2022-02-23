@@ -8,6 +8,7 @@ public class DoubleColumn extends Column {
     public DoubleColumn(String name, int min, int cardinality, double divide) {
         this.name = name;
         this.type = "double";
+        this.defaultStr = "\"12345678901234567890123456789012345678901234567890.1234567890123456789\"";
         this.min = min;
         this.cardinality = cardinality;
         this.divide = divide;

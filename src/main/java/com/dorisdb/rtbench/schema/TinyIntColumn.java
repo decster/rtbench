@@ -7,6 +7,7 @@ public class TinyIntColumn extends Column {
     public TinyIntColumn(String name, int min, int cardinality) {
         this.name = name;
         this.type = "tinyint";
+        this.defaultStr = "\"127\"";
         this.min = min;
         this.cardinality = cardinality;
     }

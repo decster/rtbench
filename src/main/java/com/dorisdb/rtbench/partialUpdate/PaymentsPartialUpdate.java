@@ -18,12 +18,13 @@ public class PaymentsPartialUpdate {
     Config conf;
     boolean withDelete;
     boolean partial_update;
+    boolean pureDataLoad;
     int repeatedColumnsNum;
     int[] numerousPartialColumnIdxes;
     int entryPerDay;
     double entryPerSecond;
     double deleteRatio = 0.02f;
-    double updateRatio = 0.2f;
+    double updateRatio;
     String tableName;
     Schema schema;
     IntArray ids;
@@ -34,6 +35,8 @@ public class PaymentsPartialUpdate {
         this.conf = conf;
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
+        this.pureDataLoad = conf.getBoolean("pure_data_load");
+        this.updateRatio = conf.getDouble("update_ratio");
         this.repeatedColumnsNum = conf.getInt("repeated_columns_num");
         String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
         this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
@@ -72,11 +75,11 @@ public class PaymentsPartialUpdate {
             INT("setup_method_id", 1, 10),
             DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100),
             DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("service_charge", 9, 2, 1000, 1000000),
-            DECIMAL("late_fee", 9, 2, 1000, 100000),
+            DECIMAL("service_charge", 27, 9, 1000, 1000000),
+            DECIMAL("late_fee", 27, 9, 1000, 100000),
             DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("penalty", 9, 2, 1000, 100000),
-            DECIMAL("default_interest", 9, 2, 300, 1200),
+            DECIMAL("penalty", 27, 9, 1000, 100000),
+            DECIMAL("default_interest", 27, 9, 300, 1200),
             U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
         };
 
@@ -103,44 +106,32 @@ public class PaymentsPartialUpdate {
     }
 
     void processEpoch(int ts, int duration) throws Exception {
-        int nDelete = 0;
-        if (withDelete) {
+        int nUpdate = 0;
+        int[] newIds = generate(ts, duration);
+        if (pureDataLoad == false) {
             // TODO(cbl): more reasonable calculation
-            nDelete = Math.min((int)(entryPerSecond*duration*deleteRatio), (int)(ids.getSize()*deleteRatio));
-            if (nDelete > 0) {
-                int[] deleteIds = ids.sample(nDelete, ts);
-                for (int i=0;i<deleteIds.length;i++) {
+            nUpdate = Math.min((int)(entryPerSecond*duration*updateRatio), (int)(ids.getSize()*updateRatio));
+            if (nUpdate > 0) {
+                int[] updateIds = ids.sample(nUpdate, ts);
+                for (int i=0;i<updateIds.length;i++) {
                     DataOperation op = new DataOperation();
-                    schema.genOpNumerousColumns(deleteIds[i], deleteIds[i], 0, op, numerousPartialColumnIdxes);
+                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, numerousPartialColumnIdxes);
                     op.table = tableName;
-                    op.op = Op.DELETE;
+                    op.op = Op.UPSERT;
                     load.handler.onDataOperation(op);
                 }
-                ids.remove(deleteIds);
             }
-        }
-        // TODO(cbl): more reasonable calculation
-        int nUpdate = Math.min((int)(entryPerSecond*duration*updateRatio), (int)(ids.getSize()*updateRatio));
-        if (nUpdate > 0) {
-            int[] updateIds = ids.sample(nUpdate, ts);
-            for (int i=0;i<updateIds.length;i++) {
+        } else {
+            for (int i=0;i<newIds.length;i++) {
                 DataOperation op = new DataOperation();
-                schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, numerousPartialColumnIdxes);
+                schema.genOpNumerousColumns(newIds[i], newIds[i], 0, op, numerousPartialColumnIdxes);
                 op.table = tableName;
-                op.op = Op.UPSERT;
+                op.op = Op.INSERT;
                 load.handler.onDataOperation(op);
             }
         }
-        int[] newIds = generate(ts, duration);
-        for (int i=0;i<newIds.length;i++) {
-            DataOperation op = new DataOperation();
-            schema.genOpNumerousColumns(newIds[i], newIds[i], 0, op, numerousPartialColumnIdxes);
-            op.table = tableName;
-            op.op = Op.INSERT;
-            load.handler.onDataOperation(op);
-        }
         ids.append(newIds, 0, newIds.length);
-        LOG.info(String.format("epoch #del:%d #update:%d #new:%d #current:%d", nDelete, nUpdate, newIds.length, ids.getSize()));
+        LOG.info(String.format("epoch #update:%d #new:%d #current:%d", nUpdate, newIds.length, ids.getSize()));
     }
 
     String getCreateTableSql() {

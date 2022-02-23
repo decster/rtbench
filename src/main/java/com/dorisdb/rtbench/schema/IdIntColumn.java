@@ -5,6 +5,7 @@ public class IdIntColumn  extends Column {
         this.name = name;
         this.type = "int";
         this.isKey = true;
+        this.defaultStr = "\"2147483647\"";
     }
 
     @Override

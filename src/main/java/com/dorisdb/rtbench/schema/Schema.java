@@ -60,6 +60,16 @@ public class Schema {
         }
     }
 
+    public void genOpNumerousColumns(long idx, long seed, long updateSeed, DataOperation op, int[] numerousPartialColumnIdxes) {
+        op.fullFieldNames = columnNames;
+        op.keyFieldIdxs = keyColumnIdxs;
+        op.fullFields = new Object[numerousPartialColumnIdxes.length];
+        for (int i=0;i<numerousPartialColumnIdxes.length;i++) {
+            op.fullFields[i] = columns[numerousPartialColumnIdxes[i]].generate(idx, seed, updateSeed);
+            seed = Utils.nextRand(seed);
+        }
+    }
+
     public String getCreateTableMySql(String tableName) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("create table %s (", tableName));
@@ -86,6 +96,7 @@ public class Schema {
         for (int i=0;i<columns.length;i++) {
             Column c = columns[i];
             sb.append(String.format("%s%s %s%s", i==0 ? "":",", c.name, c.type, c.nullable ? " NULL" : " NOT NULL"));
+            sb.append(String.format(" default %s", c.defaultStr));
         }
         sb.append(") primary key(");
         // primary key columns

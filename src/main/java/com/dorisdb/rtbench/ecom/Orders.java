@@ -294,12 +294,22 @@ public class Orders {
 
     String getCreateTableSql() {
         String ret = "create table if not exists orders ("
-                + "id bigint not null," + "userid bigint not null,"
-                + "goodid int not null," + "merchantid int not null," + "ship_address varchar(256) not null,"
-                + "ship_mode varchar(32) not null," + "order_date int not null," + "order_ts int not null,"
-                + "payment_ts int null," + "delivery_start_ts int null," + "delivery_finish_ts int null,"
-                + "quantify int not null," + "price int not null," + "discount tinyint not null,"
-                + "revenue int not null," + "state tinyint not null";
+                + "id bigint not null,"
+                + "userid bigint not null,"
+                + "goodid int not null,"
+                + "merchantid int not null,"
+                + "ship_address varchar(256) not null,"
+                + "ship_mode varchar(32) not null,"
+                + "order_date int not null,"
+                + "order_ts int not null,"
+                + "payment_ts int null,"
+                + "delivery_start_ts int null,"
+                + "delivery_finish_ts int null,"
+                + "quantify int not null,"
+                + "price int not null,"
+                + "discount tinyint not null,"
+                + "revenue int not null,"
+                + "state tinyint not null";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
             ret += String.format(") %s key(id) ", conf.getString("handler.dorisdb.table_key_type")) ;
             ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\")",
@@ -309,5 +319,4 @@ public class Orders {
         }
         return ret;
     }
-
 }

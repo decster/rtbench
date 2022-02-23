@@ -6,6 +6,7 @@ public abstract class Column implements java.lang.Cloneable {
     public boolean isKey = false;
     public boolean nullable = false;
     public boolean updatable = false;
+    public String defaultStr = "\"0\"";
 
     @Override
     public Object clone() throws CloneNotSupportedException {

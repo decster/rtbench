@@ -6,6 +6,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.dorisdb.rtbench.ecom.EcomWorkload;
 import com.dorisdb.rtbench.xyd.XydWorkload;
+import com.dorisdb.rtbench.partialUpdate.PartialUpdateWorkload;
 import com.typesafe.config.Config;
 
 public class Main {
@@ -19,6 +20,8 @@ public class Main {
             workload = new EcomWorkload();
         } else if (workloadName.equals("xyd")) {
             workload = new XydWorkload();
+        } else if (workloadName.equals("partial_update")) {
+            workload = new PartialUpdateWorkload();
         } else {
             throw new Exception("workload not found: " + workloadName);
         }

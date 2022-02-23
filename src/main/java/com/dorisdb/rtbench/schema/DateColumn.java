@@ -11,6 +11,7 @@ public class DateColumn extends Column {
     public DateColumn(String name, String minDate, int days) {
         this.name = name;
         this.type = "date";
+        this.defaultStr = "\"1970-01-01\"";
         this.min = Utils.dateToTs(minDate);
         this.days = days;
     }

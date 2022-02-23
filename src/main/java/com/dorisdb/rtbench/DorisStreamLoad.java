@@ -31,6 +31,7 @@ public class DorisStreamLoad implements DorisLoad {
     boolean dryRun;
     boolean withDelete;
     boolean partial_update;
+    int[] numerousPartialColumnIdxes;
     String authHeader;
     String tmpDir;
     File outFile;
@@ -46,6 +47,11 @@ public class DorisStreamLoad implements DorisLoad {
         this.dryRun = conf.getBoolean("dry_run");
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
+        String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
+        this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
+        for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
+            this.numerousPartialColumnIdxes[i] = Integer.parseInt(numerousPartialColumnStrIdxes[i]);
+        }
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
@@ -165,7 +171,15 @@ public class DorisStreamLoad implements DorisLoad {
         put.setHeader("label", label + randLabelSuffix);
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");
-        if (partial_update && columnNames != null) {
+        if (partial_update && numerousPartialColumnIdxes.length != 0) {
+            put.setHeader("partial_update", "true");
+            String[] partialColumnNames = new String[numerousPartialColumnIdxes.length];
+            for (int i = 0; i < numerousPartialColumnIdxes.length; i++) {
+                partialColumnNames[i] = columnNames[numerousPartialColumnIdxes[i]];
+            }
+            String columnMapping = String.join(",", partialColumnNames);
+            put.setHeader("columns", columnMapping);
+        } else if (partial_update && columnNames != null) {
             put.setHeader("partial_update", "true");
             String columnMapping = String.join(",", columnNames[0], columnNames[15]);
             put.setHeader("columns", columnMapping);

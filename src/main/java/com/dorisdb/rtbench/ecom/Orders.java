@@ -163,7 +163,7 @@ public class Orders {
     static final String[] allColumnNames = {
             "id", "userid", "goodid", "merchantid", "ship_address",
             "ship_mode", "order_date", "order_ts", "payment_ts",
-            "delivery_start_ts", "delivery_finish_ts", "quantify",
+            "delivery_start_ts", "delivery_finish_ts", "quantity",
             "price", "discount", "revenue", "state"};
     static final int[] keyColumnIdxs = {0};
     static final int[] updatePayedIdxs = {8, 15};
@@ -305,7 +305,7 @@ public class Orders {
                 + "payment_ts int null,"
                 + "delivery_start_ts int null,"
                 + "delivery_finish_ts int null,"
-                + "quantify int not null,"
+                + "quantity int not null,"
                 + "price int not null,"
                 + "discount tinyint not null,"
                 + "revenue int not null,"

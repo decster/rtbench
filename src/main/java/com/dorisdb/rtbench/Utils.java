@@ -66,6 +66,18 @@ public class Utils {
             return sample(x);
 
         }
+
+        public static void tests(int min, int max) {
+            PowerDist d = new PowerDist(min, max);
+            long f = 1111;
+            for (int i = 0;i<20;i++) {
+                f = nextRand(f);
+                int v = d.sample(f);
+                System.out.print(v);
+                System.out.print(" ");
+            }
+            System.out.println();
+        }
     }
 
     static public class Poisson {

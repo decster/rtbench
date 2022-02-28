@@ -21,8 +21,7 @@ public class DorisDBHandler implements WorkloadHandler {
     Statement st;
     boolean dryRun;
     boolean recordMaxVersionCount;
-    String streamLoadAddr;
-    boolean streamLoadKeepFile;
+    long fileSize;
     String dbName;
     String curLabel;
     long loadWait;
@@ -94,6 +93,7 @@ public class DorisDBHandler implements WorkloadHandler {
             LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
             long t0 = System.nanoTime();
             load.send();
+            fileSize = load.getFileSize();
             if (recordMaxVersionCount) {
                 st.execute(String.format("use " + dbName));
                 st.execute(String.format("show tablet from %s", load.getTable()));
@@ -167,5 +167,8 @@ public class DorisDBHandler implements WorkloadHandler {
     public void onClose() throws Exception {
         closeStatement();
     }
+
+    @Override
+    public long getFileSize() throws Exception { return fileSize; }
 
 }

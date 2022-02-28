@@ -7,6 +7,9 @@ import com.dorisdb.rtbench.DataOperation;
 import com.dorisdb.rtbench.DataOperation.Op;
 import com.dorisdb.rtbench.IntArray;
 import com.dorisdb.rtbench.schema.Schema;
+import com.dorisdb.rtbench.Utils;
+import com.dorisdb.rtbench.Utils.PowerDist;
+import java.util.Random;
 import static com.dorisdb.rtbench.schema.Columns.*;
 import com.typesafe.config.Config;
 
@@ -16,37 +19,24 @@ public class PaymentsPartialUpdate {
 
     PartialUpdateWorkload load;
     Config conf;
-    boolean withDelete;
-    boolean partial_update;
     boolean pureDataLoad;
     int repeatedColumnsNum;
-    int[] numerousPartialColumnIdxes;
-    int entryPerDay;
-    double entryPerSecond;
-    double deleteRatio = 0.02f;
-    double updateRatio;
+    int allColumnNum;
     String tableName;
     Schema schema;
     IntArray ids;
     int curId;
 
+    long rand = 1;
+    
     public PaymentsPartialUpdate(PartialUpdateWorkload load, Config conf) throws Exception {
         this.load = load;
         this.conf = conf;
-        this.withDelete = conf.getBoolean("with_delete");
-        this.partial_update = conf.getBoolean("partial_update");
         this.pureDataLoad = conf.getBoolean("pure_data_load");
-        this.updateRatio = conf.getDouble("update_ratio");
         this.repeatedColumnsNum = conf.getInt("repeated_columns_num");
-        String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
-        this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
-        for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
-            this.numerousPartialColumnIdxes[i] = Integer.parseInt(numerousPartialColumnStrIdxes[i]);
-        }
+        this.allColumnNum = conf.getInt("all_column_num");
         this.tableName = "payments_partial_update";
-        this.entryPerDay = conf.getInt("record_per_day");
-        this.entryPerSecond = (entryPerDay / (3600 * 24.0));
-        this.ids = new IntArray(0, entryPerDay*2);
+        this.ids = new IntArray(0, 1024);
         this.curId = 0;
 
         java.util.ArrayList<com.dorisdb.rtbench.schema.Column> numerous_cols_list = new java.util.ArrayList<com.dorisdb.rtbench.schema.Column>();
@@ -83,12 +73,15 @@ public class PaymentsPartialUpdate {
             U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
         };
 
-        for (com.dorisdb.rtbench.schema.Column prototype : prototypes) {
-            for (int i = 0; i < repeatedColumnsNum; i++) {
-                com.dorisdb.rtbench.schema.Column col = (com.dorisdb.rtbench.schema.Column)prototype.clone();
-                col.setName(String.format("%s%02d", col.name, i));
-                numerous_cols_list.add(col);
-            }
+        Random generator = new Random();
+
+        int[] indexes = new int[prototypes.length];
+
+        for (int i = 0; i < allColumnNum; ++i) {
+            int rn = generator.nextInt(prototypes.length);
+            com.dorisdb.rtbench.schema.Column prototype = (com.dorisdb.rtbench.schema.Column)prototypes[rn].clone();
+            prototype.setName(String.format("%s%03d", prototype.name, indexes[rn]++));
+            numerous_cols_list.add(prototype);
         }
 
         com.dorisdb.rtbench.schema.Column[] numerous_value_cols = new com.dorisdb.rtbench.schema.Column[numerous_cols_list.size()];
@@ -97,7 +90,7 @@ public class PaymentsPartialUpdate {
     }
 
     int[] generate(int ts, int duration) {
-        int[] ret = new int[(int)(duration*entryPerSecond)];
+        int[] ret = new int[(int)(duration)];
         for (int i = 0; i < ret.length; i++) {
             ret[i] = curId;
             curId++;
@@ -105,33 +98,50 @@ public class PaymentsPartialUpdate {
         return ret;
     }
 
-    void processEpoch(int ts, int duration) throws Exception {
-        int nUpdate = 0;
-        int[] newIds = generate(ts, duration);
-        if (pureDataLoad == false) {
-            // TODO(cbl): more reasonable calculation
-            nUpdate = Math.min((int)(entryPerSecond*duration*updateRatio), (int)(ids.getSize()*updateRatio));
-            if (nUpdate > 0) {
-                int[] updateIds = ids.sample(nUpdate, ts);
-                for (int i=0;i<updateIds.length;i++) {
-                    DataOperation op = new DataOperation();
-                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, numerousPartialColumnIdxes);
-                    op.table = tableName;
-                    op.op = Op.UPSERT;
-                    load.handler.onDataOperation(op);
-                }
-            }
-        } else {
+    void processEpoch(int ts, int recordNum, double updateRatio, boolean exponential_distribution) throws Exception {
+        if (pureDataLoad) {
+            int[] newIds = generate(ts, recordNum);
             for (int i=0;i<newIds.length;i++) {
                 DataOperation op = new DataOperation();
-                schema.genOpNumerousColumns(newIds[i], newIds[i], 0, op, numerousPartialColumnIdxes);
+                schema.genOp(newIds[i], newIds[i], 0, op);
                 op.table = tableName;
                 op.op = Op.INSERT;
                 load.handler.onDataOperation(op);
             }
+            ids.append(newIds, 0, newIds.length);
+            LOG.info(String.format("epoch #new:%d #current:%d", newIds.length, ids.getSize()));
+        } else {
+            int nUpdate = recordNum;
+            if (nUpdate > 0) {
+                IntArray idxes = new IntArray(0, ts);
+                curId = 0;
+                int[] allNewIds = generate(ts, ts);
+                idxes.append(allNewIds, 0, allNewIds.length);
+                int updateColumnNum = (int)(schema.nCol * updateRatio);
+                int [] updateColumnIdxes = new int[updateColumnNum];
+                for (int i = 0; i < updateColumnNum; i++) {
+                    updateColumnIdxes[i] = i;
+                }
+                int[] updateIds = new int[nUpdate];
+                if (!exponential_distribution) {
+                    updateIds = idxes.sample(nUpdate, ts);
+                } else {
+                    PowerDist paymentTime = new PowerDist(200, 400, 1.1f);
+                    for (int i = 0; i < nUpdate; ++i) {
+                        rand = Utils.nextRand(rand);
+                        updateIds[i] = paymentTime.sample(rand) - 200;
+                    }
+                }
+                for (int i=0;i<updateIds.length;i++) {
+                    DataOperation op = new DataOperation();
+                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, updateColumnIdxes);
+                    op.table = tableName;
+                    op.op = Op.UPSERT;
+                    load.handler.onDataOperation(op);
+                }
+                LOG.info(String.format("epoch #update:%d #current:%d", nUpdate, idxes.getSize()));
+            }
         }
-        ids.append(newIds, 0, newIds.length);
-        LOG.info(String.format("epoch #update:%d #new:%d #current:%d", nUpdate, newIds.length, ids.getSize()));
     }
 
     String getCreateTableSql() {

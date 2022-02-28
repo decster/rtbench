@@ -8,4 +8,6 @@ public interface DorisLoad {
     public String getLabel();
 
     public long getOpCount();
+
+    public long getFileSize();
 }

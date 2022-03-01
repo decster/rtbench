@@ -63,6 +63,7 @@ public class Schema {
     public void genOpNumerousColumns(long idx, long seed, long updateSeed, DataOperation op, int[] numerousPartialColumnIdxes) {
         op.fullFieldNames = columnNames;
         op.keyFieldIdxs = keyColumnIdxs;
+        op.updateFieldIdxs = numerousPartialColumnIdxes;
         op.fullFields = new Object[numerousPartialColumnIdxes.length];
         for (int i=0;i<numerousPartialColumnIdxes.length;i++) {
             op.fullFields[i] = columns[numerousPartialColumnIdxes[i]].generate(idx, seed, updateSeed);

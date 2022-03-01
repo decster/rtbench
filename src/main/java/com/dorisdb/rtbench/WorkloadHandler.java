@@ -20,4 +20,6 @@ public interface WorkloadHandler {
     void onEpochEnd(long id, String name) throws Exception;
 
     void onClose() throws Exception;
+    
+    long getFileSize() throws Exception;
 }

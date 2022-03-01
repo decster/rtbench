@@ -3,6 +3,7 @@ package com.dorisdb.rtbench;
 import java.io.File;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
@@ -31,10 +32,12 @@ public class DorisStreamLoad implements DorisLoad {
     boolean dryRun;
     boolean withDelete;
     boolean partial_update;
+    boolean pureDataLoad;
     int[] numerousPartialColumnIdxes;
     String authHeader;
     String tmpDir;
     File outFile;
+    long fileSize;
     boolean keepFile;
     PrintWriter out;
     long opCount;
@@ -47,6 +50,7 @@ public class DorisStreamLoad implements DorisLoad {
         this.dryRun = conf.getBoolean("dry_run");
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
+        this.pureDataLoad = conf.getBoolean("pure_data_load");
         String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
         this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
         for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
@@ -91,6 +95,7 @@ public class DorisStreamLoad implements DorisLoad {
     static final char FIELD_SEP = '\001';
     static final char [] NULL_FIELD = new char[] {'\\', 'N'};
     static String [] columnNames = null;
+    static int [] updateFieldIdxs = null;
 
     public void addData(DataOperation op) throws Exception {
         opCount++;
@@ -100,6 +105,9 @@ public class DorisStreamLoad implements DorisLoad {
         PrintWriter out = getWriter();
         if (columnNames == null) {
             columnNames = op.fullFieldNames.clone();
+        }
+        if (!pureDataLoad && updateFieldIdxs == null) {
+            updateFieldIdxs = op.updateFieldIdxs.clone();
         }
         if (op.op == Op.INSERT || op.op == Op.UPSERT || op.op == Op.DELETE) {
             for (int i=0;i<op.fullFields.length;i++) {
@@ -171,21 +179,20 @@ public class DorisStreamLoad implements DorisLoad {
         put.setHeader("label", label + randLabelSuffix);
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");
-        if (partial_update && numerousPartialColumnIdxes.length != 0) {
-            put.setHeader("partial_update", "true");
-            String[] partialColumnNames = new String[numerousPartialColumnIdxes.length];
-            for (int i = 0; i < numerousPartialColumnIdxes.length; i++) {
-                partialColumnNames[i] = columnNames[numerousPartialColumnIdxes[i]];
+        if (!pureDataLoad) {
+            if (partial_update && numerousPartialColumnIdxes.length != 0) {
+                put.setHeader("partial_update", "true");
+                int updateColumnNum = updateFieldIdxs.length;
+                String columnMapping = String.join(",", Arrays.copyOfRange(columnNames, 0, updateColumnNum));
+                put.setHeader("columns", columnMapping);
+            } else if (partial_update && columnNames != null) {
+                put.setHeader("partial_update", "true");
+                String columnMapping = String.join(",", columnNames[0], columnNames[15]);
+                put.setHeader("columns", columnMapping);
+            } else if (withDelete && columnNames != null) {
+                String columnMapping = getColumnMappingExpr(columnNames);
+                put.setHeader("columns", columnMapping);
             }
-            String columnMapping = String.join(",", partialColumnNames);
-            put.setHeader("columns", columnMapping);
-        } else if (partial_update && columnNames != null) {
-            put.setHeader("partial_update", "true");
-            String columnMapping = String.join(",", columnNames[0], columnNames[15]);
-            put.setHeader("columns", columnMapping);
-        } else if (withDelete && columnNames != null) {
-            String columnMapping = getColumnMappingExpr(columnNames);
-            put.setHeader("columns", columnMapping);
         }
         put.setEntity(new FileEntity(outFile));
         CloseableHttpResponse response = client.execute(put);
@@ -220,11 +227,14 @@ public class DorisStreamLoad implements DorisLoad {
                 }
             }
         } finally {
+            this.fileSize = outFile.length();
             if (!keepFile) {
                 outFile.delete();
             }
         }
     }
+
+    public long getFileSize() { return fileSize; }
 
     private static String basicAuthHeader(String username, String password) {
         final String tobeEncode = username + ":" + password;

@@ -7,15 +7,14 @@ import com.dorisdb.rtbench.DataOperation;
 import com.dorisdb.rtbench.DataOperation.Op;
 import com.dorisdb.rtbench.IntArray;
 import com.dorisdb.rtbench.schema.Schema;
-import com.dorisdb.rtbench.Utils;
-import com.dorisdb.rtbench.Utils.PowerDist;
+import com.dorisdb.rtbench.ZipfSampler;
 import java.util.Random;
 import static com.dorisdb.rtbench.schema.Columns.*;
 import com.typesafe.config.Config;
 
 
-public class PaymentsPartialUpdate {
-    private static final Logger LOG = LogManager.getLogger(PaymentsPartialUpdate.class);
+public class PartialUpdate {
+    private static final Logger LOG = LogManager.getLogger(PartialUpdate.class);
 
     PartialUpdateWorkload load;
     Config conf;
@@ -27,15 +26,15 @@ public class PaymentsPartialUpdate {
     IntArray ids;
     int curId;
 
-    long rand = 1;
+    long rand = 1L;
     
-    public PaymentsPartialUpdate(PartialUpdateWorkload load, Config conf) throws Exception {
+    public PartialUpdate(PartialUpdateWorkload load, Config conf) throws Exception {
         this.load = load;
         this.conf = conf;
         this.pureDataLoad = conf.getBoolean("pure_data_load");
         this.repeatedColumnsNum = conf.getInt("repeated_columns_num");
         this.allColumnNum = conf.getInt("all_column_num");
-        this.tableName = "payments_partial_update";
+        this.tableName = "partial_update";
         this.ids = new IntArray(0, 1024);
         this.curId = 0;
 
@@ -89,7 +88,7 @@ public class PaymentsPartialUpdate {
         schema = new Schema(numerous_value_cols);
     }
 
-    int[] generate(int ts, int duration) {
+    int[] generate(int duration) {
         int[] ret = new int[(int)(duration)];
         for (int i = 0; i < ret.length; i++) {
             ret[i] = curId;
@@ -100,7 +99,7 @@ public class PaymentsPartialUpdate {
 
     void processEpoch(int ts, int recordNum, double updateRatio, boolean exponential_distribution) throws Exception {
         if (pureDataLoad) {
-            int[] newIds = generate(ts, recordNum);
+            int[] newIds = generate(recordNum);
             for (int i=0;i<newIds.length;i++) {
                 DataOperation op = new DataOperation();
                 schema.genOp(newIds[i], newIds[i], 0, op);
@@ -109,13 +108,13 @@ public class PaymentsPartialUpdate {
                 load.handler.onDataOperation(op);
             }
             ids.append(newIds, 0, newIds.length);
-            LOG.info(String.format("epoch #new:%d #current:%d", newIds.length, ids.getSize()));
+            // LOG.info(String.format("#new: %d #current: %d", newIds.length, ids.getSize()));
         } else {
             int nUpdate = recordNum;
             if (nUpdate > 0) {
                 IntArray idxes = new IntArray(0, ts);
                 curId = 0;
-                int[] allNewIds = generate(ts, ts);
+                int[] allNewIds = generate(ts);
                 idxes.append(allNewIds, 0, allNewIds.length);
                 int updateColumnNum = (int)(schema.nCol * updateRatio);
                 int [] updateColumnIdxes = new int[updateColumnNum];
@@ -124,12 +123,11 @@ public class PaymentsPartialUpdate {
                 }
                 int[] updateIds = new int[nUpdate];
                 if (!exponential_distribution) {
-                    updateIds = idxes.sample(nUpdate, ts);
+                    updateIds = idxes.sample(nUpdate, System.currentTimeMillis());
                 } else {
-                    PowerDist paymentTime = new PowerDist(200, 400, 1.1f);
-                    for (int i = 0; i < nUpdate; ++i) {
-                        rand = Utils.nextRand(rand);
-                        updateIds[i] = paymentTime.sample(rand) - 200;
+                    ZipfSampler z = new ZipfSampler(0, nUpdate);
+                    for (int i = 0; i < nUpdate; i++) {
+                        updateIds[i] = (int)z.sample();
                     }
                 }
                 for (int i=0;i<updateIds.length;i++) {
@@ -139,7 +137,7 @@ public class PaymentsPartialUpdate {
                     op.op = Op.UPSERT;
                     load.handler.onDataOperation(op);
                 }
-                LOG.info(String.format("epoch #update:%d #current:%d", nUpdate, idxes.getSize()));
+                LOG.info(String.format("#update:%d #current:%d", nUpdate, idxes.getSize()));
             }
         }
     }

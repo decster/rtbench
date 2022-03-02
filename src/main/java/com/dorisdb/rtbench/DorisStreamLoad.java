@@ -106,7 +106,7 @@ public class DorisStreamLoad implements DorisLoad {
         if (columnNames == null) {
             columnNames = op.fullFieldNames.clone();
         }
-        if (!pureDataLoad && updateFieldIdxs == null) {
+        if (!pureDataLoad) {
             updateFieldIdxs = op.updateFieldIdxs.clone();
         }
         if (op.op == Op.INSERT || op.op == Op.UPSERT || op.op == Op.DELETE) {

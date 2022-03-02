@@ -90,8 +90,8 @@ public class DorisDBHandler implements WorkloadHandler {
     void executeAndClearAllLoads() throws Exception {
         for (Map.Entry<String, DorisLoad> e : loadByTable.entrySet()) {
             DorisLoad load = e.getValue();
-            LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
-            long t0 = System.nanoTime();
+            // LOG.info(String.format("stream load %s op:%d start", load.getLabel(), load.getOpCount()));
+            // long t0 = System.nanoTime();
             load.send();
             fileSize = load.getFileSize();
             if (recordMaxVersionCount) {
@@ -106,8 +106,8 @@ public class DorisDBHandler implements WorkloadHandler {
                     maxVersionCount = versionCount;
                 }
             }
-            long t1 = System.nanoTime();
-            LOG.info(String.format("stream load %s op:%d done %.2fs", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000000.0));
+            // long t1 = System.nanoTime();
+            // LOG.info(String.format("load %s op:%d done %.2fms", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000.0));
             Thread.sleep(loadWait);
         }
         if (recordMaxVersionCount) {

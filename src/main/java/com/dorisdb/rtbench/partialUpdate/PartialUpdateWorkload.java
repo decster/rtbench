@@ -19,6 +19,8 @@ public class PartialUpdateWorkload extends Workload {
     PartialUpdate partialUpdate;
     long recordNum;
     boolean pureDataLoad;
+    long totalFileSize;
+    long recordPerLoad;
 
     public PartialUpdateWorkload() {
     }
@@ -35,6 +37,8 @@ public class PartialUpdateWorkload extends Workload {
         partialUpdate = new PartialUpdate(this, conf);
         dbName = conf.getString("db.name");
         pureDataLoad = conf.getBoolean("pure_data_load");
+        totalFileSize = 1024*1024*1024L*conf.getInt("total_file_size");
+        recordPerLoad = conf.getLong("record_per_load");
         handler.onSqlOperation(new SqlOperation(String.format("create database if not exists %s", dbName)));
         handler.onSqlOperation(new SqlOperation("use " + dbName));
         if (conf.getBoolean("cleanup") && pureDataLoad) {
@@ -58,33 +62,32 @@ public class PartialUpdateWorkload extends Workload {
         setup();
         handler.onSetupEnd();
 
+        long id = 0L;
+
         if (pureDataLoad) {
-            long id = 0L;
-            long loadedFileSize = 0L;
-            long totalFileSize = 1024*1024*1024L;
             long loadedRecordNum = 0L;
-            long oneLoadRecordNum = 1024*1024*10L;
-            LOG.info(String.format("=========================== total %.2fG, one load %d rows ===========================", totalFileSize / (1024*1024*1024f), oneLoadRecordNum));
+            long loadedFileSize = 0L;
+            LOG.info(String.format("=========================== total %.2fG, %d rows per load ===========================", totalFileSize / (1024*1024*1024f), recordPerLoad));
             while (true) {
                 String epochName = String.valueOf(id);
-                // LOG.info("start epoch " + id);
                 handler.onEpochBegin(id, epochName);
-                partialUpdate.processEpoch((int)loadedRecordNum, (int)oneLoadRecordNum, 0, false);
-                // LOG.info("end epoch " + id);
+                if (loadedRecordNum != 0) {
+                    recordPerLoad = Math.min((int)((double)(totalFileSize - loadedFileSize) / loadedFileSize * loadedRecordNum), recordPerLoad);
+                }
+                partialUpdate.processEpoch(0, (int)recordPerLoad, 0, false);
                 long t0 = System.nanoTime();
                 handler.onEpochEnd(id, epochName);
                 long t1 = System.nanoTime();
+                loadedRecordNum += recordPerLoad;
                 loadedFileSize += handler.getFileSize();
-                loadedRecordNum += oneLoadRecordNum;
                 String label = String.format("load-partial_update-%s", epochName);
-                LOG.info(String.format("%s cost %.2fs, loadedRecordNum: %d, loadedFileSize: %.2fG, progress: %.2f%%", label, (t1-t0) / 1000000000.0, loadedRecordNum,  loadedFileSize / (1024*1024*1024f), loadedFileSize / (double)totalFileSize * 100));
+                LOG.info(String.format("%s.data cost %.2fs, loadedRecordNum: %d, loadedFileSize: %.2fG, progress: %.2f%%", label, (t1-t0) / 1000000000.0, loadedRecordNum,  loadedFileSize / (1024*1024*1024f), loadedFileSize / (double)totalFileSize * 100));
                 if (loadedFileSize > totalFileSize) {
                     break;
                 }
                 id++;
             }
         } else {
-            long id = 0L;
             long loadedRecordNum = conf.getLong("loaded_record_num");
             boolean[] exponential_distributions = {false, true};
             double[] updateRatios = {0.1, 0.2, 0.5, 0.8};
@@ -95,16 +98,23 @@ public class PartialUpdateWorkload extends Workload {
                 for (int k = 0; k < updateRatios.length; ++k) {
                     double updateRatio = updateRatios[k];
                     for (int j = 0; j < recordNums.length; ++j) {
-                        long oneLoadRecordNum = recordNums[j];
-                        LOG.info("===========================" + (exponential_distribution ? "exponential" : "random") + " partial update " + oneLoadRecordNum + " records " + "of leftmost " + updateRatio + " columns " + updateRepeatTimes + " times in " + loadedRecordNum + " records" + "===========================");
+                        long recordPerLoad = recordNums[j];
+                        double total_elapsed_second = 0;
+                        LOG.info("===========================" + (exponential_distribution ? "exponential" : "random") + " partial update " + recordPerLoad + " records " + "of leftmost " + updateRatio + " columns " + updateRepeatTimes + " times in " + loadedRecordNum + " records" + "===========================");
                         for (int i = 1; i <= updateRepeatTimes; ++i) {
-                            String epochName = "partial-" + oneLoadRecordNum + "-" + String.valueOf(id);
-                            LOG.info("-------------" + "NO." + i + "/" + updateRepeatTimes + "-------------");
+                            String epochName = "partial-" + recordPerLoad + "-" + String.valueOf(id);
                             handler.onEpochBegin(0, epochName);
-                            partialUpdate.processEpoch((int)loadedRecordNum, (int)oneLoadRecordNum, updateRatio, exponential_distribution);
+                            partialUpdate.processEpoch((int)loadedRecordNum, (int)recordPerLoad, updateRatio, exponential_distribution);
+                            long t0 = System.nanoTime();
                             handler.onEpochEnd(0, epochName);
+                            long t1 = System.nanoTime();
+                            double elapsed_second = (t1-t0) / 1000000000.0;
+                            total_elapsed_second += elapsed_second;
+                            String label = String.format("load-partial_update-%s", epochName);
+                            LOG.info(String.format("%s.data elapsed %.2fs", label, elapsed_second));
                             id++;
                         }
+                        LOG.info(String.format("average elapsed %.2fs", total_elapsed_second / updateRepeatTimes));
                     }
                 }
             }

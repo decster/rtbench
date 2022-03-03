@@ -107,7 +107,7 @@ public class DorisDBHandler implements WorkloadHandler {
                 }
             }
             // long t1 = System.nanoTime();
-            // LOG.info(String.format("load %s op:%d done %.2fms", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000.0));
+            // LOG.info(String.format("load %s op:%d done %.2fs", load.getLabel(), load.getOpCount(), (t1-t0) / 1000000000.0));
             Thread.sleep(loadWait);
         }
         if (recordMaxVersionCount) {

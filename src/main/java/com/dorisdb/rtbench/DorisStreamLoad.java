@@ -51,11 +51,6 @@ public class DorisStreamLoad implements DorisLoad {
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
         this.pureDataLoad = conf.getBoolean("pure_data_load");
-        String[] numerousPartialColumnStrIdxes = conf.getString("numerous_partial_columns").split(",");
-        this.numerousPartialColumnIdxes = new int[numerousPartialColumnStrIdxes.length];
-        for (int i = 0; i < numerousPartialColumnStrIdxes.length; i++) {
-            this.numerousPartialColumnIdxes[i] = Integer.parseInt(numerousPartialColumnStrIdxes[i]);
-        }
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
@@ -180,10 +175,9 @@ public class DorisStreamLoad implements DorisLoad {
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");
         if (!pureDataLoad) {
-            if (partial_update && numerousPartialColumnIdxes.length != 0) {
+            if (partial_update) {
                 put.setHeader("partial_update", "true");
-                int updateColumnNum = updateFieldIdxs.length;
-                String columnMapping = String.join(",", Arrays.copyOfRange(columnNames, 0, updateColumnNum));
+                String columnMapping = String.join(",", Arrays.copyOfRange(columnNames, 0, updateFieldIdxs.length));
                 put.setHeader("columns", columnMapping);
             } else if (partial_update && columnNames != null) {
                 put.setHeader("partial_update", "true");

@@ -32,7 +32,6 @@ public class PartialUpdate {
         this.load = load;
         this.conf = conf;
         this.pureDataLoad = conf.getBoolean("pure_data_load");
-        this.repeatedColumnsNum = conf.getInt("repeated_columns_num");
         this.allColumnNum = conf.getInt("all_column_num");
         this.tableName = "partial_update";
         this.ids = new IntArray(0, 1024);
@@ -137,7 +136,7 @@ public class PartialUpdate {
                     op.op = Op.UPSERT;
                     load.handler.onDataOperation(op);
                 }
-                LOG.info(String.format("#update:%d #current:%d", nUpdate, idxes.getSize()));
+                // LOG.info(String.format("#update:%d #current:%d", nUpdate, idxes.getSize()));
             }
         }
     }

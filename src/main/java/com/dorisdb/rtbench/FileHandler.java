@@ -100,6 +100,11 @@ public class FileHandler implements WorkloadHandler {
     }
 
     @Override
+    public java.sql.ResultSet onSqlOperationResult(SqlOperation op) throws Exception {
+        return null;
+    }
+
+    @Override
     public void onDataOperation(DataOperation op) throws Exception {
         if (dryRun) {
             return;
@@ -133,4 +138,7 @@ public class FileHandler implements WorkloadHandler {
     @Override
     public void onClose() throws Exception {
     }
+
+    @Override
+    public long getFileSize() { return 0; }
 }

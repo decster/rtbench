@@ -220,6 +220,11 @@ public class MysqlHandler implements WorkloadHandler {
     }
 
     @Override
+    public java.sql.ResultSet onSqlOperationResult(SqlOperation op) throws Exception {
+        return null;
+    }
+
+    @Override
     public void onSetupEnd() throws Exception {
         flush();
         closeStatement();
@@ -252,4 +257,7 @@ public class MysqlHandler implements WorkloadHandler {
     public void onClose() throws Exception {
         closeStatement();
     }
+
+    @Override
+    public long getFileSize() { return 0; }
 }

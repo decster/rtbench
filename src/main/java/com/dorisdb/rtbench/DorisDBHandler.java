@@ -85,6 +85,17 @@ public class DorisDBHandler implements WorkloadHandler {
         }
     }
 
+    @Override
+    public java.sql.ResultSet onSqlOperationResult(SqlOperation op) throws Exception {
+        if (dryRun) {
+            LOG.info("execute sql: " + op.sql);
+            return null;
+        } else {
+            st.execute(op.sql);
+            return st.getResultSet();
+        }
+    }
+
     Map<String, DorisLoad> loadByTable;
 
     void executeAndClearAllLoads() throws Exception {
@@ -169,6 +180,6 @@ public class DorisDBHandler implements WorkloadHandler {
     }
 
     @Override
-    public long getFileSize() throws Exception { return fileSize; }
+    public long getFileSize() { return fileSize; }
 
 }

@@ -81,4 +81,7 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
     public long getOpCount() {
         return opCount;
     }
+
+    @Override
+    public long getFileSize() { return 0; }
 }

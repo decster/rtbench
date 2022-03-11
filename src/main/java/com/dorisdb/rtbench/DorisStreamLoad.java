@@ -44,8 +44,6 @@ public class DorisStreamLoad implements DorisLoad {
     int retry = 0;
     long retrySleepSec = 3;
 
-    static final String randLabelSuffix = "_" + Utils.newRandShortID(4);
-
     public DorisStreamLoad(Config conf, String db, String table, String label) {
         this.dryRun = conf.getBoolean("dry_run");
         this.withDelete = conf.getBoolean("with_delete");
@@ -171,6 +169,7 @@ public class DorisStreamLoad implements DorisLoad {
         HttpPut put = new HttpPut(url);
         put.setHeader(HttpHeaders.EXPECT, "100-continue");
         put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        String randLabelSuffix = "_" + Utils.newRandShortID(6);
         put.setHeader("label", label + randLabelSuffix);
         put.setHeader("format", "csv");
         put.setHeader("column_separator", "\\x01");

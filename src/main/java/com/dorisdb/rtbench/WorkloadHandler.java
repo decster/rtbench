@@ -7,6 +7,8 @@ public interface WorkloadHandler {
 
     void onSqlOperation(SqlOperation op) throws Exception;
 
+    java.sql.ResultSet onSqlOperationResult(SqlOperation op) throws Exception;
+
     void onDataOperation(DataOperation op) throws Exception;
 
     void flush() throws Exception;
@@ -21,5 +23,5 @@ public interface WorkloadHandler {
 
     void onClose() throws Exception;
     
-    long getFileSize() throws Exception;
+    long getFileSize();
 }

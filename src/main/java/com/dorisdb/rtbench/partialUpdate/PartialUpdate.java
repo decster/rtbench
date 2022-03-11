@@ -5,7 +5,6 @@ import org.apache.logging.log4j.Logger;
 
 import com.dorisdb.rtbench.DataOperation;
 import com.dorisdb.rtbench.DataOperation.Op;
-import com.dorisdb.rtbench.IntArray;
 import com.dorisdb.rtbench.schema.Schema;
 import com.dorisdb.rtbench.ZipfSampler;
 import java.util.Random;
@@ -23,8 +22,8 @@ public class PartialUpdate {
     int allColumnNum;
     String tableName;
     Schema schema;
-    IntArray ids;
-    int curId;
+    long curId;
+    long columnSeed;
 
     long rand = 1L;
     
@@ -33,9 +32,9 @@ public class PartialUpdate {
         this.conf = conf;
         this.pureDataLoad = conf.getBoolean("pure_data_load");
         this.allColumnNum = conf.getInt("all_column_num");
+        this.columnSeed = conf.getLong("column_seed");
         this.tableName = "partial_update";
-        this.ids = new IntArray(0, 1024);
-        this.curId = 0;
+        this.curId = 0L;
 
         java.util.ArrayList<com.dorisdb.rtbench.schema.Column> numerous_cols_list = new java.util.ArrayList<com.dorisdb.rtbench.schema.Column>();
 
@@ -63,15 +62,15 @@ public class PartialUpdate {
             INT("setup_method_id", 1, 10),
             DATETIME("created_at", "2020-04-01 00:00:00", 3600*24*100),
             DATETIME("updated_at", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("service_charge", 27, 9, 1000, 1000000),
-            DECIMAL("late_fee", 27, 9, 1000, 100000),
+            DECIMAL("service_charge", 9, 2, 1000, 1000000),
+            DECIMAL("late_fee", 9, 2, 1000, 100000),
             DATETIME("schedule_time", "2020-04-01 00:00:00", 3600*24*100),
-            DECIMAL("penalty", 27, 9, 1000, 100000),
-            DECIMAL("default_interest", 27, 9, 300, 1200),
+            DECIMAL("penalty", 9, 2, 1000, 100000),
+            DECIMAL("default_interest", 9, 2, 300, 1200),
             U(DATETIME("updated_at_sp", "2020-04-01 00:00:00", 3600*24*100))
         };
 
-        Random generator = new Random();
+        Random generator = new Random(columnSeed);
 
         int[] indexes = new int[prototypes.length];
 
@@ -87,8 +86,8 @@ public class PartialUpdate {
         schema = new Schema(numerous_value_cols);
     }
 
-    int[] generate(int duration) {
-        int[] ret = new int[(int)(duration)];
+    long[] generate(int duration) {
+        long[] ret = new long[(int)(duration)];
         for (int i = 0; i < ret.length; i++) {
             ret[i] = curId;
             curId++;
@@ -96,9 +95,10 @@ public class PartialUpdate {
         return ret;
     }
 
-    void processEpoch(int ts, int recordNum, double updateRatio, boolean exponential_distribution) throws Exception {
+    void processEpoch(long loadedRecordNum, int recordNum, double updateRatio, boolean exponential_distribution) throws Exception {
         if (pureDataLoad) {
-            int[] newIds = generate(recordNum);
+            curId = loadedRecordNum;
+            long[] newIds = generate(recordNum);
             for (int i=0;i<newIds.length;i++) {
                 DataOperation op = new DataOperation();
                 schema.genOp(newIds[i], newIds[i], 0, op);
@@ -106,37 +106,38 @@ public class PartialUpdate {
                 op.op = Op.INSERT;
                 load.handler.onDataOperation(op);
             }
-            ids.append(newIds, 0, newIds.length);
-            // LOG.info(String.format("#new: %d #current: %d", newIds.length, ids.getSize()));
         } else {
             int nUpdate = recordNum;
             if (nUpdate > 0) {
-                IntArray idxes = new IntArray(0, ts);
                 curId = 0;
-                int[] allNewIds = generate(ts);
-                idxes.append(allNewIds, 0, allNewIds.length);
                 int updateColumnNum = (int)(schema.nCol * updateRatio);
                 int [] updateColumnIdxes = new int[updateColumnNum];
                 for (int i = 0; i < updateColumnNum; i++) {
                     updateColumnIdxes[i] = i;
                 }
-                int[] updateIds = new int[nUpdate];
+                long[] updateIds = new long[nUpdate];
                 if (!exponential_distribution) {
-                    updateIds = idxes.sample(nUpdate, System.currentTimeMillis());
+                    Random generator = new Random();
+                    for (int i = 0; i < nUpdate; ++i) {
+                        long l = generator.nextLong();
+                        if (l < 0) {
+                            l = -l;
+                        }
+                        updateIds[i] = l % loadedRecordNum;
+                    }
                 } else {
-                    ZipfSampler z = new ZipfSampler(0, nUpdate);
+                    ZipfSampler z = new ZipfSampler(0, loadedRecordNum);
                     for (int i = 0; i < nUpdate; i++) {
-                        updateIds[i] = (int)z.sample();
+                        updateIds[i] = z.sample();
                     }
                 }
                 for (int i=0;i<updateIds.length;i++) {
                     DataOperation op = new DataOperation();
-                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], ts, op, updateColumnIdxes);
+                    schema.genOpNumerousColumns(updateIds[i], updateIds[i], loadedRecordNum, op, updateColumnIdxes);
                     op.table = tableName;
                     op.op = Op.UPSERT;
                     load.handler.onDataOperation(op);
                 }
-                // LOG.info(String.format("#update:%d #current:%d", nUpdate, idxes.getSize()));
             }
         }
     }

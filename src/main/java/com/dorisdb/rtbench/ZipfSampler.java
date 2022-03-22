@@ -193,6 +193,10 @@ public class ZipfSampler {
         return ret;
     }
 
+    public boolean initialized(long items) {
+        return this.items == items;
+    }
+
     public static void tests(int min, int max) {
         ZipfSampler z = new ZipfSampler(min, max);
         for (int i=0;i<20;i++) {

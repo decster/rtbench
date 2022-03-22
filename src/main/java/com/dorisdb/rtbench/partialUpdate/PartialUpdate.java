@@ -24,6 +24,7 @@ public class PartialUpdate {
     Schema schema;
     long curId;
     long columnSeed;
+    ZipfSampler z;
 
     long rand = 1L;
     
@@ -38,7 +39,7 @@ public class PartialUpdate {
 
         java.util.ArrayList<com.dorisdb.rtbench.schema.Column> numerous_cols_list = new java.util.ArrayList<com.dorisdb.rtbench.schema.Column>();
 
-        numerous_cols_list.add(IDINT("id"));
+        numerous_cols_list.add(IDLONG("id"));
 
         com.dorisdb.rtbench.schema.Column[] prototypes = {
             DATE("setup_due_date", "2020-05-01", 100),
@@ -126,7 +127,9 @@ public class PartialUpdate {
                         updateIds[i] = l % loadedRecordNum;
                     }
                 } else {
-                    ZipfSampler z = new ZipfSampler(0, loadedRecordNum);
+                    if (z == null || !z.initialized(loadedRecordNum - 0)) {
+                        z = new ZipfSampler(0, loadedRecordNum);
+                    }
                     for (int i = 0; i < nUpdate; i++) {
                         updateIds[i] = z.sample();
                     }

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -37,6 +38,9 @@ public class PartialUpdateWorkload extends Workload {
     long totalFileSize;
     long recordPerLoad;
     String partialUpdateColumns;
+    AtomicLong loadedFileSize = new AtomicLong(0L);
+    int loadConcurrency;
+    long loadedRecordNum = 0L;
 
     public PartialUpdateWorkload() {
     }
@@ -56,6 +60,7 @@ public class PartialUpdateWorkload extends Workload {
         totalFileSize = 1024*1024*1024L*conf.getInt("total_file_size");
         recordPerLoad = conf.getLong("record_per_load");
         partialUpdateColumns = conf.getString("partial_update_columns");
+        loadConcurrency = conf.getInt("handler.dorisdb.load_concurrency");
         handler.onSqlOperation(new SqlOperation(String.format("create database if not exists %s", dbName)));
         handler.onSqlOperation(new SqlOperation("use " + dbName));
         if (pureDataLoad) {
@@ -75,11 +80,98 @@ public class PartialUpdateWorkload extends Workload {
     public void close() {
     }
 
+    private void dataSend(String label) throws Exception {
+        final HttpClientBuilder httpClientBuilder = HttpClients
+        .custom()
+        .setRedirectStrategy(new DefaultRedirectStrategy() {
+            @Override
+            protected boolean isRedirectable(String method) {
+                return true;
+            }
+        });
+        CloseableHttpClient client = httpClientBuilder.build();
+        String url = String.format("http://%s/api/%s/%s/_stream_load", conf.getString("handler.dorisdb.stream_load.addr"), dbName, partialUpdate.tableName);
+        HttpPut put = new HttpPut(url);
+        put.setHeader(HttpHeaders.EXPECT, "100-continue");
+        String username = conf.getString("handler.dorisdb.user");
+        String password = conf.getString("handler.dorisdb.password");
+        final String tobeEncode = username + ":" + password;
+        byte[] encoded = Base64.getEncoder().encode(tobeEncode.getBytes(StandardCharsets.UTF_8));
+        String authHeader = "Basic " + new String(encoded);
+        put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        String randLabelSuffix = "_" + Utils.newRandShortID(6);
+        put.setHeader("label", label + randLabelSuffix);
+        put.setHeader("format", "csv");
+        put.setHeader("column_separator", "\\x01");
+        File outFile = new File(String.format("%s/%s.data", conf.getString("handler.dorisdb.tmpdir"), label));
+        put.setEntity(new FileEntity(outFile));
+        long t0 = System.nanoTime();
+        CloseableHttpResponse response = client.execute(put);
+        long t1 = System.nanoTime();
+        final int status = response.getStatusLine().getStatusCode();
+        long fileSize = outFile.length();
+        loadedFileSize.getAndAdd(fileSize);
+        String result = "null";
+        if (response.getEntity() != null) {
+            result =  EntityUtils.toString(response.getEntity());
+        }
+        if (status != 200 || !(result.contains("OK") || (result.contains("Label Already Exists") && result.contains("FINISHED")))) {
+            throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", dbName, partialUpdate.tableName, label, result));
+        }
+        LOG.info(String.format("%s.data loaded, size: %.2fG, elapsed: %.2fs, FileSize: %.2fG, progress: %.2f%%", label, fileSize / (1024*1024*1024f), (t1-t0) / 1000000000.0,  loadedFileSize.get() / (1024*1024*1024f), loadedFileSize.get() / (double)totalFileSize * 100));
+    }
+
+    private void partialUpdateSend(String label, boolean exponential_distribution, double updateRatio, long updateRepeatTimes) throws Exception {
+        final HttpClientBuilder httpClientBuilder = HttpClients
+        .custom()
+        .setRedirectStrategy(new DefaultRedirectStrategy() {
+            @Override
+            protected boolean isRedirectable(String method) {
+                return true;
+            }
+        });
+        CloseableHttpClient client = httpClientBuilder.build();
+        String url = String.format("http://%s/api/%s/%s/_stream_load", conf.getString("handler.dorisdb.stream_load.addr"), dbName, partialUpdate.tableName);
+        HttpPut put = new HttpPut(url);
+        put.setHeader(HttpHeaders.EXPECT, "100-continue");
+        String username = conf.getString("handler.dorisdb.user");
+        String password = conf.getString("handler.dorisdb.password");
+        final String tobeEncode = username + ":" + password;
+        byte[] encoded = Base64.getEncoder().encode(tobeEncode.getBytes(StandardCharsets.UTF_8));
+        String authHeader = "Basic " + new String(encoded);
+        put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        String randLabelSuffix = "_" + Utils.newRandShortID(6);
+        put.setHeader("label", label + randLabelSuffix);
+        put.setHeader("format", "csv");
+        put.setHeader("column_separator", "\\x01");
+        put.setHeader("partial_update", "true");
+        put.setHeader("columns", partialUpdateColumns);
+        File outFile = new File(String.format("%s/%s.data", conf.getString("handler.dorisdb.tmpdir"), label));
+        put.setEntity(new FileEntity(outFile));
+        long t0 = System.nanoTime();
+        CloseableHttpResponse response = client.execute(put);
+        long t1 = System.nanoTime();
+        final int status = response.getStatusLine().getStatusCode();
+        String result = "null";
+        if (response.getEntity() != null) {
+            result =  EntityUtils.toString(response.getEntity());
+        }
+        if (status != 200 || !(result.contains("OK") || (result.contains("Label Already Exists") && result.contains("FINISHED")))) {
+            throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", dbName, partialUpdate.tableName, label, result));
+        }
+
+        double elapsed_second = (t1-t0) / 1000000000.0;
+        // total_elapsed_second += elapsed_second;
+        long fileSize = outFile.length();
+        // loadedFileSize += fileSize;
+
+        LOG.info(String.format("%s.data loaded, size: %.3fM elapsed %.2fs, %s update %d records of leftmost %.0f%% columns %d times in %d records", label, fileSize / (1024*1024f), elapsed_second, exponential_distribution ? "exponential" : "random", recordPerLoad, updateRatio * 100, updateRepeatTimes, loadedRecordNum));
+    }
+
     @Override
     public void run() throws Exception {
         handler.onSetupBegin();
         setup();
-        long loadedRecordNum = 0L;
         if (!conf.getBoolean("cleanup") || !pureDataLoad) {
             java.sql.ResultSet rs = handler.onSqlOperationResult(new SqlOperation("select max(id) from partial_update"));
             if (rs.next() == false) {
@@ -115,50 +207,38 @@ public class PartialUpdateWorkload extends Workload {
                 }
                 LOG.info(String.format("%d columns, %.1fG total, %d records", conf.getInt("all_column_num"), generatedFileSize / (1024*1024*1024f), generatedRecordNum));
             } else {
-                long loadedFileSize = 0;
-                for (long id = 0; id < conf.getInt("loaded_file_num"); ++id) {
-                    String label = String.format("load-partial_update-%s", id);
+                for (int id = 0; id < conf.getInt("generated_file_num");) {
+                    int threadNum = Math.min(conf.getInt("generated_file_num") - id, loadConcurrency);
+                    Thread[] threads = new Thread[threadNum];
+                    Exception[] rets = new Exception[threadNum];
 
-                    final HttpClientBuilder httpClientBuilder = HttpClients
-                    .custom()
-                    .setRedirectStrategy(new DefaultRedirectStrategy() {
-                        @Override
-                        protected boolean isRedirectable(String method) {
-                            return true;
+                    for (int i=0;i<threads.length;i++) {
+                        String label = String.format("load-partial_update-%s", id + i);
+                        final int idx = i;
+                        threads[i] = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    dataSend(label);
+                                } catch (Exception e) {
+                                    rets[idx] = e;
+                                }
+                            }
+                        });
+                    }
+
+                    for (int i=0;i<threads.length;i++) {
+                        threads[i].start();
+                    }
+                    for (int i=0;i<threads.length;i++) {
+                        threads[i].join();
+                    }
+                    for (int i=0;i<threads.length;i++) {
+                        if (rets[i] != null) {
+                            throw rets[i];
                         }
-                    });
-                    CloseableHttpClient client = httpClientBuilder.build();
-                    String url = String.format("http://%s/api/%s/%s/_stream_load", conf.getString("handler.dorisdb.stream_load.addr"), dbName, partialUpdate.tableName);
-                    HttpPut put = new HttpPut(url);
-                    put.setHeader(HttpHeaders.EXPECT, "100-continue");
-
-                    String username = conf.getString("handler.dorisdb.user");
-                    String password = conf.getString("handler.dorisdb.password");
-                    final String tobeEncode = username + ":" + password;
-                    byte[] encoded = Base64.getEncoder().encode(tobeEncode.getBytes(StandardCharsets.UTF_8));
-                    String authHeader = "Basic " + new String(encoded);
-                    put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
-                    String randLabelSuffix = "_" + Utils.newRandShortID(6);
-                    put.setHeader("label", label + randLabelSuffix);
-                    put.setHeader("format", "csv");
-                    put.setHeader("column_separator", "\\x01");
-                    File outFile = new File(String.format("%s/%s.data", conf.getString("handler.dorisdb.tmpdir"), label));
-                    put.setEntity(new FileEntity(outFile));
-                    long t0 = System.nanoTime();
-                    CloseableHttpResponse response = client.execute(put);
-                    long t1 = System.nanoTime();
-                    final int status = response.getStatusLine().getStatusCode();
-                    long fileSize = outFile.length();
-                    loadedFileSize += fileSize;
-                    String result = "null";
-                    if (response.getEntity() != null) {
-                        result =  EntityUtils.toString(response.getEntity());
                     }
-                    if (status != 200 || !(result.contains("OK") || (result.contains("Label Already Exists") && result.contains("FINISHED")))) {
-                        throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", dbName, partialUpdate.tableName, label, result));
-                    }
-
-                    LOG.info(String.format("%s.data loaded, size: %.2fG, elapsed: %.2fs, FileSize: %.2fG, progress: %.2f%%", label, fileSize / (1024*1024*1024f), (t1-t0) / 1000000000.0,  loadedFileSize / (1024*1024*1024f), loadedFileSize / (double)totalFileSize * 100));
+                    id += threadNum;
                 }
             }
         } else {
@@ -166,9 +246,9 @@ public class PartialUpdateWorkload extends Workload {
                 // boolean[] exponential_distributions = {false, true};
                 boolean[] exponential_distributions = {false};
                 // double[] updateRatios = {0.1, 0.2, 0.5, 0.8};
-                double[] updateRatios = {0.1};
+                double[] updateRatios = {0.2};
                 // long[] recordNums = {1000L, 10000L, 100000L, 1000000L};
-                long[] recordNums = {100000L};
+                long[] recordNums = {10000L};
                 List<String> table_lines = new ArrayList<>();
                 table_lines.add(String.format("|distribution|upd col|row num|AVG time|op per sec|file size|"));
                 for (int l = 0; l < exponential_distributions.length; ++l) {
@@ -178,12 +258,6 @@ public class PartialUpdateWorkload extends Workload {
                         for (int j = 0; j < recordNums.length; ++j) {
                             long generatedFileSize = 0L;
                             long recordPerLoad = recordNums[j];
-                            // long updateRepeatTimes = 0L;
-                            // if (recordPerLoad >= 100000) {
-                            //     updateRepeatTimes = 3;
-                            // } else {
-                            //     updateRepeatTimes = 6;
-                            // }
                             long updateRepeatTimes = conf.getLong("update_repeat_times");
                             double total_elapsed_second = 0;
                             for (int i = 0; i < updateRepeatTimes; ++i) {
@@ -215,9 +289,9 @@ public class PartialUpdateWorkload extends Workload {
                 // boolean[] exponential_distributions = {false, true};
                 boolean[] exponential_distributions = {false};
                 // double[] updateRatios = {0.1, 0.2, 0.5, 0.8};
-                double[] updateRatios = {0.1};
+                double[] updateRatios = {0.2};
                 // long[] recordNums = {1000L, 10000L, 100000L, 1000000L};
-                long[] recordNums = {100000L};
+                long[] recordNums = {10000L};
                 List<String> table_lines = new ArrayList<>();
                 table_lines.add(String.format("|distribution|upd col|row num|AVG time|op per sec|file size|"));
                 for (int l = 0; l < exponential_distributions.length; ++l) {
@@ -225,69 +299,48 @@ public class PartialUpdateWorkload extends Workload {
                     for (int k = 0; k < updateRatios.length; ++k) {
                         double updateRatio = updateRatios[k];
                         for (int j = 0; j < recordNums.length; ++j) {
-                            long loadedFileSize = 0L;
+                            // long loadedFileSize = 0L;
                             long recordPerLoad = recordNums[j];
-                            // long updateRepeatTimes = 5L;
-                            // if (recordPerLoad >= 100000) {
-                            //     updateRepeatTimes = 3;
-                            // } else {
-                            //     updateRepeatTimes = 6;
-                            // }
                             long updateRepeatTimes = conf.getLong("update_repeat_times");
-                            double total_elapsed_second = 0;
-                            for (int i = 0; i < updateRepeatTimes; ++i) {
-                                String label = "load-partial_update-partial-" + (exponential_distribution ? "exponential" : "random") + "-P" + (int)(updateRatio * 100) + "-" + recordPerLoad + "-" + "NO-" + String.valueOf(i);
+                            // double total_elapsed_second = 0;
+                            for (long i = 0; i < updateRepeatTimes; ++i) {
+                                int threadNum = Math.min((int)(updateRepeatTimes - i), loadConcurrency);
+                                Thread[] threads = new Thread[threadNum];
+                                Exception[] rets = new Exception[threadNum];
 
-                                final HttpClientBuilder httpClientBuilder = HttpClients
-                                .custom()
-                                .setRedirectStrategy(new DefaultRedirectStrategy() {
-                                    @Override
-                                    protected boolean isRedirectable(String method) {
-                                        return true;
+                                for (int ti=0;ti<threads.length;ti++) {
+                                    String label = "load-partial_update-partial-" + (exponential_distribution ? "exponential" : "random") + "-P" + (int)(updateRatio * 100) + "-" + recordPerLoad + "-" + "NO-" + String.valueOf(i + ti);
+                                    final int idx = ti;
+                                    threads[ti] = new Thread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            try {
+                                                partialUpdateSend(label, exponential_distribution, updateRatio, updateRepeatTimes);
+                                            } catch (Exception e) {
+                                                rets[idx] = e;
+                                            }
+                                        }
+                                    });
+                                }
+
+                                for (int ti=0;ti<threads.length;ti++) {
+                                    threads[ti].start();
+                                }
+                                for (int ti=0;ti<threads.length;ti++) {
+                                    threads[ti].join();
+                                }
+                                for (int ti=0;ti<threads.length;ti++) {
+                                    if (rets[ti] != null) {
+                                        throw rets[ti];
                                     }
-                                });
-                                CloseableHttpClient client = httpClientBuilder.build();
-                                String url = String.format("http://%s/api/%s/%s/_stream_load", conf.getString("handler.dorisdb.stream_load.addr"), dbName, partialUpdate.tableName);
-                                HttpPut put = new HttpPut(url);
-                                put.setHeader(HttpHeaders.EXPECT, "100-continue");
-                                String username = conf.getString("handler.dorisdb.user");
-                                String password = conf.getString("handler.dorisdb.password");
-                                final String tobeEncode = username + ":" + password;
-                                byte[] encoded = Base64.getEncoder().encode(tobeEncode.getBytes(StandardCharsets.UTF_8));
-                                String authHeader = "Basic " + new String(encoded);
-                                put.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
-                                String randLabelSuffix = "_" + Utils.newRandShortID(6);
-                                put.setHeader("label", label + randLabelSuffix);
-                                put.setHeader("format", "csv");
-                                put.setHeader("column_separator", "\\x01");
-                                put.setHeader("partial_update", "true");
-                                put.setHeader("columns", partialUpdateColumns);
-                                File outFile = new File(String.format("%s/%s.data", conf.getString("handler.dorisdb.tmpdir"), label));
-                                put.setEntity(new FileEntity(outFile));
-                                long t0 = System.nanoTime();
-                                CloseableHttpResponse response = client.execute(put);
-                                long t1 = System.nanoTime();
-                                final int status = response.getStatusLine().getStatusCode();
-                                String result = "null";
-                                if (response.getEntity() != null) {
-                                    result =  EntityUtils.toString(response.getEntity());
                                 }
-                                if (status != 200 || !(result.contains("OK") || (result.contains("Label Already Exists") && result.contains("FINISHED")))) {
-                                    throw new Exception(String.format("doris stream load: db=%s,table=%s label=%s failed, err=%s", dbName, partialUpdate.tableName, label, result));
-                                }
-
-                                double elapsed_second = (t1-t0) / 1000000000.0;
-                                total_elapsed_second += elapsed_second;
-                                long fileSize = outFile.length();
-                                loadedFileSize += fileSize;
-
-                                LOG.info(String.format("%s.data loaded, size: %.3fM elapsed %.2fs, %s update %d records of leftmost %.0f%% columns %d times in %d records", label, fileSize / (1024*1024f), elapsed_second, exponential_distribution ? "exponential" : "random", recordPerLoad, updateRatio * 100, updateRepeatTimes, loadedRecordNum));
+                                i += threadNum;
                             }
                             // natural language print
                             // LOG.info(String.format("%s update %d records of leftmost %.0f%% columns %d times in %d records, average elapsed %.2fs", exponential_distribution ? "exponential" : "random", recordPerLoad, updateRatio * 100, updateRepeatTimes, loadedRecordNum, total_elapsed_second / updateRepeatTimes));
                             // table print
-                            double average_elapsed_second = total_elapsed_second / updateRepeatTimes;
-                            table_lines.add(String.format("|%12s|%6d%%|%7d|%7.2fs|%10.0f|%8.2fM|", exponential_distribution ? "exponential" : "random", (int)(updateRatio * 100), recordPerLoad, average_elapsed_second, recordPerLoad / average_elapsed_second, loadedFileSize / (1024*1024f)));
+                            // double average_elapsed_second = total_elapsed_second / updateRepeatTimes;
+                            // table_lines.add(String.format("|%12s|%6d%%|%7d|%7.2fs|%10.0f|%8.2fM|", exponential_distribution ? "exponential" : "random", (int)(updateRatio * 100), recordPerLoad, average_elapsed_second, recordPerLoad / average_elapsed_second, loadedFileSize / (1024*1024f)));
                         }
                     }
                 }

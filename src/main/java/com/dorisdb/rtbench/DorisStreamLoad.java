@@ -33,6 +33,7 @@ public class DorisStreamLoad implements DorisLoad {
     boolean withDelete;
     boolean partial_update;
     boolean pureDataLoad;
+    boolean pureDataLoadPrepare;
     int[] numerousPartialColumnIdxes;
     String authHeader;
     String tmpDir;
@@ -49,6 +50,7 @@ public class DorisStreamLoad implements DorisLoad {
         this.withDelete = conf.getBoolean("with_delete");
         this.partial_update = conf.getBoolean("partial_update");
         this.pureDataLoad = conf.getBoolean("pure_data_load");
+        this.pureDataLoadPrepare = conf.getBoolean("data_load_prepare");
         this.addr = conf.getString("handler.dorisdb.stream_load.addr");
         this.keepFile = conf.getBoolean("handler.dorisdb.stream_load.keep_file");
         this.url = String.format("http://%s/api/%s/%s/_stream_load", addr, db, table);
@@ -95,13 +97,13 @@ public class DorisStreamLoad implements DorisLoad {
         if (dryRun) {
             return;
         }
-        PrintWriter out = getWriter();
         if (columnNames == null) {
             columnNames = op.fullFieldNames.clone();
         }
         if (!pureDataLoad) {
             updateFieldIdxs = op.updateFieldIdxs.clone();
         }
+        PrintWriter out = getWriter();
         if (op.op == Op.INSERT || op.op == Op.UPSERT || op.op == Op.DELETE) {
             for (int i=0;i<op.fullFields.length;i++) {
                 if (i > 0) {
@@ -128,6 +130,7 @@ public class DorisStreamLoad implements DorisLoad {
         } else {
             throw new Exception("op type not support");
         }
+        this.fileSize = outFile.length();
     }
 
     static String getColumnMappingExpr(String[] colNames) {
@@ -203,6 +206,10 @@ public class DorisStreamLoad implements DorisLoad {
         if (out == null) {
             return;
         }
+        if (pureDataLoadPrepare) {
+            out.close();
+            return;
+        }
         try {
             out.close();
             while (true) {
@@ -220,7 +227,6 @@ public class DorisStreamLoad implements DorisLoad {
                 }
             }
         } finally {
-            this.fileSize = outFile.length();
             if (!keepFile) {
                 outFile.delete();
             }

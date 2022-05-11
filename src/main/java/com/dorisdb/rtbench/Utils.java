@@ -101,7 +101,7 @@ public class Utils {
     }
 
     static final char[] IDCHARS = "abcdefghijklmnopqrstuvwxyzABSDEFGHIJKLMNOPQRSTUVWXYZ1234567890".toCharArray();
-    static String newRandShortID(int len) {
+    public static String newRandShortID(int len) {
         Random r = new Random(System.currentTimeMillis());
         char[] id = new char[len];
         for (int i = 0;  i < len;  i++) {

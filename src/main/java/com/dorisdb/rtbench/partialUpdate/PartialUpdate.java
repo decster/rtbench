@@ -8,6 +8,7 @@ import com.dorisdb.rtbench.DataOperation.Op;
 import com.dorisdb.rtbench.schema.Schema;
 import com.dorisdb.rtbench.ZipfSampler;
 import java.util.Random;
+import java.util.Arrays;
 import static com.dorisdb.rtbench.schema.Columns.*;
 import com.typesafe.config.Config;
 
@@ -25,6 +26,7 @@ public class PartialUpdate {
     long curId;
     long columnSeed;
     ZipfSampler z;
+    boolean alreadyExecuted = false;
 
     long rand = 1L;
     
@@ -115,6 +117,11 @@ public class PartialUpdate {
                 int [] updateColumnIdxes = new int[updateColumnNum];
                 for (int i = 0; i < updateColumnNum; i++) {
                     updateColumnIdxes[i] = i;
+                }
+                if (!alreadyExecuted) {
+                    String columnMapping = String.join(",", Arrays.copyOfRange(schema.columnNames, 0, updateColumnNum));
+                    LOG.info("processEpoch: columnMapping=" + columnMapping);
+                    alreadyExecuted = true;
                 }
                 long[] updateIds = new long[nUpdate];
                 if (!exponential_distribution) {

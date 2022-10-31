@@ -4,10 +4,20 @@
     <Console name="Console" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{1}:%L - %msg%n"/>
     </Console>
+    <RollingFile name="file" fileName="log/rtbench.log"
+                 filePattern="log/rtbench-%d{yyyy-MM-dd}-%i.log" >
+      <LevelRangeFilter minLevel="INFO" maxLevel="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{1}:%L - %msg%n"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="100MB" />
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
   </Appenders>
   <Loggers>
     <Root level="info">
       <AppenderRef ref="Console"/>
+      <AppenderRef ref="file"/>
     </Root>
   </Loggers>
 </Configuration>

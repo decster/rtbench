@@ -9,9 +9,9 @@ public class BoolColumn extends Column {
     @Override
     Object generate(long idx, long seed, long updateSeed) {
         if (updatable) {
-            return (seed + updateSeed) % 2 == 0;
+            return Math.floorMod(seed + updateSeed, 2L) == 0;
         } else {
-            return seed % 2 == 0;
+            return Math.floorMod(seed, 2L) == 0;
         }
     }
 }

@@ -20,9 +20,9 @@ public class DateTimeColumn extends Column {
     Object generate(long idx, long seed, long updateSeed) {
         long d;
         if (updatable) {
-            d = (seed + updateSeed) % cardinality;
+            d = Math.floorMod(seed + updateSeed, cardinality);
         } else {
-            d = seed % cardinality;
+            d = Math.floorMod(seed, cardinality);
         }
         return Utils.dateTimeFormatter.format(new Date(this.min + d * 1000));
     }

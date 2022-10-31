@@ -58,10 +58,10 @@ public abstract class Workload {
                 break;
             }
             String epochName = tsToEpochName(curTs);
-            LOG.info("start epoch " + id + " " + epochName);
+            //LOG.info("start epoch " + id + " " + epochName);
             handler.onEpochBegin(id, epochName);
             processEpoch(id, curTs, epochDuration);
-            LOG.info("end epoch " + id + " " + epochName);
+            //LOG.info("end epoch " + id + " " + epochName);
             handler.onEpochEnd(id, epochName);
             curTs += epochDuration;
             id++;

@@ -170,48 +170,39 @@ public class Orders {
     static final int[] updateDeliverStartedIdxs = {9, 15};
     static final int[] updateDeliverFinishedIdxs = {10, 15};
 
-    void processEvents(int ts) throws Exception {
-        IntArray idxs = nextEventTsIndex[ts-indexingStartTs];
-        int nInsert = 0;
-        int nUpdate = 0;
-        Order order = new Order();
-        for (int i=0;i<idxs.getSize();i++) {
-            int idx = idxs.get(i);
-            long orderId = activeOrders.getId(idx);
-            int startTs = activeOrders.getStartTs(idx);
-            getOrder(order, orderId, startTs, ts);
-            DataOperation op = new DataOperation();
-            op.table = tableName;
-            op.keyFieldIdxs = keyColumnIdxs;
-            // upsert is used for both insert & update, so:
-            // mysql handler can use insert xx on duplicate key xx,
-            // file handler can just upsert
-            // doris handler can just upsert
-            if (order.orderTs == ts) {
-                // create new order
-                op.op = Op.UPSERT;
-                nInsert++;
-            } else {
-                // update order
-                op.op = Op.UPSERT;
-                nUpdate++;
-                if (order.state == State.PAYED.ordinal()) {
-                    op.updateFieldIdxs = updatePayedIdxs;
-                } else if (order.state == State.DELIVER_STARTED.ordinal()) {
-                    op.updateFieldIdxs = updateDeliverStartedIdxs;
-                } else if (order.state == State.DELIVER_FINISHED.ordinal()) {
-                    op.updateFieldIdxs = updateDeliverFinishedIdxs;
-                }
+    private void genOrderForIdx(int ts, int idx, Order order, DataOperation op) {
+        long orderId = activeOrders.getId(idx);
+        int startTs = activeOrders.getStartTs(idx);
+        getOrder(order, orderId, startTs, ts);
+        op.table = tableName;
+        op.keyFieldIdxs = keyColumnIdxs;
+        // upsert is used for both insert & update, so:
+        // mysql handler can use insert xx on duplicate key xx,
+        // file handler can just upsert
+        // doris handler can just upsert
+        if (order.orderTs == ts) {
+            // create new order
+            op.op = Op.UPSERT;
+        } else {
+            // update order
+            op.op = Op.UPSERT;
+            if (order.state == State.PAYED.ordinal()) {
+                op.updateFieldIdxs = updatePayedIdxs;
+            } else if (order.state == State.DELIVER_STARTED.ordinal()) {
+                op.updateFieldIdxs = updateDeliverStartedIdxs;
+            } else if (order.state == State.DELIVER_FINISHED.ordinal()) {
+                op.updateFieldIdxs = updateDeliverFinishedIdxs;
             }
-            op.fullFieldNames = allColumnNames;
-            op.keyFieldIdxs = keyColumnIdxs;
-            if (partial_update) {
-                op.fullFields = new Object[] {
+        }
+        op.fullFieldNames = allColumnNames;
+        op.keyFieldIdxs = keyColumnIdxs;
+        if (partial_update) {
+            op.fullFields = new Object[] {
                     order.id,
                     order.state
-                };
-            } else {
-                op.fullFields = new Object[] {
+            };
+        } else {
+            op.fullFields = new Object[] {
                     order.id,
                     order.userId,
                     order.goodId,
@@ -228,8 +219,18 @@ public class Orders {
                     order.discount,
                     order.revenue,
                     order.state
-                };
-            }
+            };
+        }
+
+    }
+
+    void processEvents(int ts) throws Exception {
+        IntArray idxs = nextEventTsIndex[ts-indexingStartTs];
+        Order order = new Order();
+        for (int i=0;i<idxs.getSize();i++) {
+            int idx = idxs.get(i);
+            DataOperation op = new DataOperation();
+            genOrderForIdx(ts, idx, order, op);
             load.handler.onDataOperation(op);
             if (order.nextEventTs == 0) {
                 activeOrders.setNextEventTs(idx, order.nextEventTs);
@@ -242,9 +243,6 @@ public class Orders {
                 throw new Exception("nextEvent <= currentTs");
             }
         }
-//        if (nInsert + nUpdate > 0) {
-//            LOG.info(String.format("order events at %s inserts: %d updates: %d", Utils.tsToString(ts), nInsert, nUpdate));
-//        }
     }
 
     static Calendar dateFormatCalender = Calendar.getInstance();
@@ -312,8 +310,8 @@ public class Orders {
                 + "state tinyint not null";
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
             ret += String.format(") %s key(id) ", conf.getString("handler.dorisdb.table_key_type")) ;
-            ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\")",
-                    conf.getInt("db.orders.bucket"), conf.getInt("db.replication"));
+            ret += String.format("DISTRIBUTED BY HASH(id) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\", \"enable_persistent_index\" = \"%s\")",
+                    conf.getInt("db.orders.bucket"), conf.getInt("db.replication"), conf.getString("db.orders.persistent_index"));
         } else {
             ret += ", primary key(id))";
         }

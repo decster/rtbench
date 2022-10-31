@@ -38,7 +38,6 @@ public class DorisStreamLoad implements DorisLoad {
     String authHeader;
     String tmpDir;
     File outFile;
-    long fileSize;
     boolean keepFile;
     PrintWriter out;
     long opCount;
@@ -130,7 +129,6 @@ public class DorisStreamLoad implements DorisLoad {
         } else {
             throw new Exception("op type not support");
         }
-        this.fileSize = outFile.length();
     }
 
     static String getColumnMappingExpr(String[] colNames) {
@@ -233,7 +231,8 @@ public class DorisStreamLoad implements DorisLoad {
         }
     }
 
-    public long getFileSize() { return fileSize; }
+    public long getFileSize() { return outFile.length();
+    }
 
     private static String basicAuthHeader(String username, String password) {
         final String tobeEncode = username + ":" + password;

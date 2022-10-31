@@ -20,9 +20,9 @@ public class DateColumn extends Column {
     Object generate(long idx, long seed, long updateSeed) {
         long d;
         if (updatable) {
-            d = (seed + updateSeed) % days;
+            d = Math.floorMod(seed + updateSeed, days);
         } else {
-            d = seed % days;
+            d = Math.floorMod(seed, days);
         }
         return Utils.dateFormatter.format(new Date(this.min + d * 24L* 3600 * 1000));
     }

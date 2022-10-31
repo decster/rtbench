@@ -1,13 +1,8 @@
 package com.dorisdb.rtbench.xyd;
 
 import static com.dorisdb.rtbench.schema.Columns.DATE;
-import static com.dorisdb.rtbench.schema.Columns.DATETIME;
-import static com.dorisdb.rtbench.schema.Columns.DECIMAL;
 import static com.dorisdb.rtbench.schema.Columns.DOUBLE;
 import static com.dorisdb.rtbench.schema.Columns.IDINT;
-import static com.dorisdb.rtbench.schema.Columns.INT;
-import static com.dorisdb.rtbench.schema.Columns.STRING;
-import static com.dorisdb.rtbench.schema.Columns.TINYINT;
 import static com.dorisdb.rtbench.schema.Columns.U;
 
 import org.apache.logging.log4j.LogManager;
@@ -103,7 +98,7 @@ public class Installments {
 
     String getCreateTableSql() {
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            return schema.getCreateTableDorisDB(tableName, conf.getInt("db.installments.bucket"), conf.getInt("db.replication"));
+            return schema.getCreateTable(tableName, conf.getInt("db.installments.bucket"), conf.getInt("db.replication"));
         } else {
             return schema.getCreateTableMySql(tableName);
         }

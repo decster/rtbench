@@ -209,7 +209,7 @@ public class Payments {
 
     String getCreateTableSql() {
         if (conf.getString("db.type").toLowerCase().startsWith("doris")) {
-            return schema.getCreateTableDorisDB(tableName, conf.getInt("db.payments.bucket"), conf.getInt("db.replication"));
+            return schema.getCreateTable(tableName, conf.getInt("db.payments.bucket"), conf.getInt("db.replication"));
         } else {
             return schema.getCreateTableMySql(tableName);
         }

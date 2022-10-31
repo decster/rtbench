@@ -1,13 +1,13 @@
 package com.dorisdb.rtbench.schema;
 
-public class TinyIntColumn extends Column {
-    int min = 0;
+public class BigIntColumn extends Column {
+    long min = 0;
     long cardinality = 100;
 
-    public TinyIntColumn(String name, int min, int cardinality) {
+    public BigIntColumn(String name, long min, long cardinality) {
         this.name = name;
-        this.type = "tinyint";
-        this.defaultStr = "\"127\"";
+        this.type = "int";
+        this.defaultStr = "\"2147\"";
         this.min = min;
         this.cardinality = cardinality;
     }

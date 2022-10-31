@@ -12,10 +12,19 @@ import com.typesafe.config.Config;
 public class Main {
     private static final Logger LOG = LogManager.getLogger(Main.class);
 
-    public static void main(String [] args) throws Exception {
+    public static void main(String [] args) throws Throwable {
         Config conf = ConfigFactory.load();
-        Workload workload;
         String workloadName = conf.getString("workload");
+        if (workloadName.equals("rtbenchmark")) {
+            RTBenchmark benchmark = new RTBenchmark(conf);
+            benchmark.run();
+            return;
+        } else if (workloadName.equals("rowstorepoc")) {
+            RowStorePoc benchmark = new RowStorePoc(conf);
+            benchmark.run();
+            return;
+        }
+        Workload workload;
         if (workloadName.equals("ecom")) {
             workload = new EcomWorkload();
         } else if (workloadName.equals("xyd")) {

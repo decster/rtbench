@@ -2,7 +2,7 @@ package com.dorisdb.rtbench.schema;
 
 public class IntColumn extends Column {
     int min = 0;
-    int cardinality = 100;
+    long cardinality = 100;
 
     public IntColumn(String name, int min, int cardinality) {
         this.name = name;
@@ -14,10 +14,12 @@ public class IntColumn extends Column {
 
     @Override
     Object generate(long idx, long seed, long updateSeed) {
+        long v;
         if (updatable) {
-            return (int)((seed + updateSeed) % cardinality + min);
+            v = Math.floorMod(seed + updateSeed, cardinality) + min;
         } else {
-            return (int)(seed % cardinality + min);
+            v = Math.floorMod(seed, cardinality) + min;
         }
+        return v;
     }
 }

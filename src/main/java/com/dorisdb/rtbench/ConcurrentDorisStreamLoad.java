@@ -29,7 +29,7 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
         if (k instanceof Integer) {
             shard = ((Integer) k).intValue() % numShard;
         } else if (k instanceof Long) {
-            shard = ((Long) k).intValue() % numShard;
+            shard = (int)(((Long) k).longValue() % (long)numShard);
         } else if (k instanceof String) {
             shard = ((String) k).hashCode() % numShard;
         } else {
@@ -42,7 +42,7 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
     public void send() throws Exception {
         Thread[] threads = new Thread[loads.length];
         Exception[] rets = new Exception[loads.length];
-        LOG.info(String.format("send %d loads", loads.length));
+        //LOG.info(String.format("send %d loads", loads.length));
         for (int i=0;i<threads.length;i++) {
             final int idx = i;
             threads[i] = new Thread(new Runnable() {
@@ -62,7 +62,7 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
         for (int i=0;i<threads.length;i++) {
             threads[i].join();
         }
-        LOG.info(String.format("send %d loads done", loads.length));
+        //LOG.info(String.format("send %d loads done", loads.length));
         for (int i=0;i<threads.length;i++) {
             if (rets[i] != null) {
                 throw rets[i];
@@ -83,5 +83,11 @@ public class ConcurrentDorisStreamLoad implements DorisLoad {
     }
 
     @Override
-    public long getFileSize() { return 0; }
+    public long getFileSize() {
+        long fileSize = 0;
+        for (int i=0;i<loads.length;i++) {
+            fileSize += loads[i].getFileSize();
+        }
+        return fileSize;
+    }
 }

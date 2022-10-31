@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.dorisdb.rtbench.DataOperation;
-import com.dorisdb.rtbench.DataOperation.Op;
 import com.dorisdb.rtbench.Utils;
 
 public class Schema {
@@ -56,7 +55,15 @@ public class Schema {
         op.fullFields = new Object[nCol];
         for (int i=0;i<nCol;i++) {
             op.fullFields[i] = columns[i].generate(idx, seed, updateSeed);
-            seed = Utils.nextRand(seed);
+        }
+    }
+
+    public void genPartialUpdateOp(long idx, long seed, long updateSeed, DataOperation op, int numPartialUpdateColumns) {
+        op.fullFieldNames = columnNames;
+        op.keyFieldIdxs = keyColumnIdxs;
+        op.fullFields = new Object[numPartialUpdateColumns];
+        for (int i=0;i<numPartialUpdateColumns;i++) {
+            op.fullFields[i] = columns[i].generate(idx, seed, updateSeed);
         }
     }
 
@@ -67,7 +74,6 @@ public class Schema {
         op.fullFields = new Object[numerousPartialColumnIdxes.length];
         for (int i=0;i<numerousPartialColumnIdxes.length;i++) {
             op.fullFields[i] = columns[numerousPartialColumnIdxes[i]].generate(idx, seed, updateSeed);
-            seed = Utils.nextRand(seed);
         }
     }
 
@@ -91,7 +97,15 @@ public class Schema {
         return sb.toString();
     }
 
-    public String getCreateTableDorisDB(String tableName, int bucket, int replication) {
+    public String getCreateTable(String tableName, int bucket, int replication) {
+        return getCreateTable(tableName, bucket, replication, false);
+    }
+
+    public String getCreateTable(String tableName, int bucket, int replication, boolean persistentIndex) {
+        return getCreateTable(tableName, bucket, replication, persistentIndex, "column");
+    }
+
+    public String getCreateTable(String tableName, int bucket, int replication, boolean persistentIndex, String storeType) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("create table if not exists %s (", tableName));
         for (int i=0;i<columns.length;i++) {
@@ -109,8 +123,12 @@ public class Schema {
             sb.append(c.name);
         }
         sb.append(") ");
-        sb.append(String.format("DISTRIBUTED BY HASH(%s) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\")",
-                columns[nkey-1].name, bucket, replication));
+        sb.append(String.format("DISTRIBUTED BY HASH(%s) BUCKETS %d" + " PROPERTIES(\"replication_num\" = \"%d\",\"enable_persistent_index\" = \"%s\"",
+                columns[nkey-1].name, bucket, replication, persistentIndex ? "true" : "false"));
+        if (!storeType.equals("column")) {
+            sb.append(String.format(",\"store_type\" = \"%s\"", storeType));
+        }
+        sb.append(")");
         return sb.toString();
     }
 

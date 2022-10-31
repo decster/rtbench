@@ -18,9 +18,9 @@ public class DoubleColumn extends Column {
     Object generate(long idx, long seed, long updateSeed) {
         long v;
         if (updatable) {
-            v = (seed + updateSeed) % cardinality + min;
+            v = Math.floorMod(seed + updateSeed, cardinality) + min;
         } else {
-            v = seed % cardinality + min;
+            v = Math.floorMod(seed, cardinality) + min;
         }
         return v/divide;
     }

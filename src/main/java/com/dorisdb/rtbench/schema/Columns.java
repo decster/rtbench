@@ -26,6 +26,11 @@ public class Columns {
         return ret;
     }
 
+    public static Column BIGINT(String name, long min, long num) {
+        Column ret = new BigIntColumn(name, min, num);
+        return ret;
+    }
+
     public static Column DOUBLE(String name, int min, int num, double divide) {
         Column ret = new DoubleColumn(name, min, num, divide);
         return ret;

@@ -194,7 +194,7 @@ public class RowStorePoc {
                 DataOperation op = new DataOperation();
                 Random rand = new Random(seed + ts);
                 for (long i = 0; i < num; i++) {
-                    schema.genPartialUpdateOp(rand.nextLong() % totalRows, rand.nextLong(), ts, op, nUpdateColumn);
+                    schema.genPartialUpdateOp(Math.floorMod(rand.nextLong(), totalRows), rand.nextLong(), ts, op, nUpdateColumn);
                     load.addData(op);
                 }
             } else {

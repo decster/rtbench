@@ -260,7 +260,7 @@ public class RTBenchmark {
                             if (config.getBoolean("cleanup")) {
                                 runSql(dbName, "drop table if exists " + tableName + " force", true);
                             }
-                            String createSql = schema.getCreateTable(tableName, numBucket, replication, persistentIndex);
+                            String createSql = schema.getCreateTable(tableName, type, numBucket, replication, persistentIndex);
                             runSql(dbName, createSql, true);
                         } catch (Throwable e) {
                             LOG.warn("run create table "+tableName+" failed", e);

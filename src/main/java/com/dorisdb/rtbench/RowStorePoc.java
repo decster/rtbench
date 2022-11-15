@@ -237,7 +237,7 @@ public class RowStorePoc {
                                     runSql(dbName, "drop table if exists " + tableName + " force", true);
                                 }
                                 String createSql =
-                                        schema.getCreateTable(tableName, numBucket, replication, persistentIndex, storeType);
+                                        schema.getCreateTable(tableName, "primary", numBucket, replication, persistentIndex, storeType);
                                 runSql(dbName, createSql, true);
                             } catch (Throwable e) {
                                 LOG.warn("run create table " + tableName + " failed", e);

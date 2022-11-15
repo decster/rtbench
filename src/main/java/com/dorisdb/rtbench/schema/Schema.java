@@ -98,14 +98,14 @@ public class Schema {
     }
 
     public String getCreateTable(String tableName, int bucket, int replication) {
-        return getCreateTable(tableName, bucket, replication, false);
+        return getCreateTable(tableName, "primary", bucket, replication, false);
     }
 
-    public String getCreateTable(String tableName, int bucket, int replication, boolean persistentIndex) {
-        return getCreateTable(tableName, bucket, replication, persistentIndex, "column");
+    public String getCreateTable(String tableName, String type, int bucket, int replication, boolean persistentIndex) {
+        return getCreateTable(tableName, type, bucket, replication, persistentIndex, "column");
     }
 
-    public String getCreateTable(String tableName, int bucket, int replication, boolean persistentIndex, String storeType) {
+    public String getCreateTable(String tableName, String type, int bucket, int replication, boolean persistentIndex, String storeType) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("create table if not exists %s (", tableName));
         for (int i=0;i<columns.length;i++) {
@@ -113,7 +113,7 @@ public class Schema {
             sb.append(String.format("%s%s %s%s", i==0 ? "":",", c.name, c.type, c.nullable ? " NULL" : " NOT NULL"));
             sb.append(String.format(" default %s", c.defaultStr));
         }
-        sb.append(") primary key(");
+        sb.append(String.format(") %s key(", type));
         // primary key columns
         for (int i=0;i<nkey;i++) {
             if (i>0) {
